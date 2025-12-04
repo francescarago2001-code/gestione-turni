@@ -4,67 +4,69 @@ import random
 from datetime import date, timedelta
 from fpdf import FPDF
 
-# --- CONFIGURAZIONE PAGINA (PROFESSIONAL) ---
+# --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(
-    page_title="Pianificazione Turni | Enterprise",
-    page_icon="📅",
+    page_title="Gestione Turni Operativi",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CSS STILE "CORPORATE / PROFESSIONAL" ---
+# --- CSS STILE BUSINESS (CLEAN, NO EMOJI) ---
 st.markdown("""
     <style>
-    /* Sfondo Generale */
+    /* Reset e Font */
     .stApp {
-        background-color: #f4f6f9; /* Grigio molto chiaro, tipico delle dashboard */
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #ffffff;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        color: #333333;
     }
     
     /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e0e0e0;
+        background-color: #f8f9fa;
+        border-right: 1px solid #e9ecef;
     }
     
-    /* Titoli */
+    /* Intestazioni */
     h1, h2, h3 {
-        color: #2c3e50 !important; /* Blu scuro professionale */
-        font-weight: 600;
-    }
-    
-    /* Card/Contenitori Espandibili */
-    .streamlit-expanderHeader {
-        background-color: #ffffff;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        color: #34495e;
+        color: #2c3e50 !important;
+        font-weight: 500;
+        letter-spacing: -0.5px;
     }
     
     /* Bottoni */
     .stButton>button {
-        background-color: #2c3e50; /* Blu Navy */
+        background-color: #2c3e50; /* Blu Scuro */
         color: white;
         border: none;
         border-radius: 4px;
-        padding: 10px 20px;
+        padding: 0.6rem 1.2rem;
         font-weight: 500;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
+        width: 100%;
+        transition: background 0.3s;
     }
     .stButton>button:hover {
-        background-color: #34495e;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        background-color: #1a252f;
     }
     
-    /* Tabella */
-    .dataframe {
-        border-collapse: collapse !important;
-        border: 1px solid #dee2e6 !important;
+    /* Expander e Input */
+    .streamlit-expanderHeader {
+        background-color: #ffffff;
+        color: #495057;
         font-size: 14px;
     }
+    div[data-baseweb="input"] {
+        border-radius: 4px;
+    }
     
-    /* Rimuove padding extra */
+    /* Messaggi */
+    .stAlert {
+        border: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+        color: #333;
+    }
+    
+    /* Spaziatura */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 3rem;
@@ -72,26 +74,31 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- GESTIONE STATO (PER MANTENERE I DATI MENTRE SI MODIFICA) ---
+if 'schedule_df' not in st.session_state:
+    st.session_state.schedule_df = None
+
 # --- FUNZIONI LOGICHE ---
 def generate_date_range(start_date, num_days):
     return [start_date + timedelta(days=i) for i in range(num_days)]
 
-def calculate_target(total_days, weekly_rest, vacation_days):
+def calculate_target(total_days, weekly_rest):
+    # Calcolo semplice: Totale giorni - (Settimane * Riposi settimanali)
     weeks = total_days / 7
     total_rest = round(weeks * weekly_rest)
-    target = total_days - total_rest - vacation_days
+    target = total_days - total_rest
     return max(0, target)
 
-def generate_schedule(staff_data, date_list, shift_types):
+def generate_schedule(staff_data, date_list, shift_types, prevent_consecutive):
     schedule = []
     
-    # Contatori
+    # Inizializza contatori
     work_counts = {name: 0 for name in staff_data.keys()}
     targets = {}
     
-    # Calcolo Target
+    # Calcolo Target Lavorativo
     for name, data in staff_data.items():
-        targets[name] = calculate_target(len(date_list), data['weekly_rest'], len(data['ferie']))
+        targets[name] = calculate_target(len(date_list), data['weekly_rest'])
 
     for current_day in date_list:
         day_schedule = {
@@ -99,41 +106,37 @@ def generate_schedule(staff_data, date_list, shift_types):
             "Giorno": current_day.strftime("%A")
         }
         
-        # Lista di chi ha già lavorato OGGI (per evitare doppi turni nello stesso giorno)
+        # Lista di chi ha già lavorato oggi
         worked_today = []
         
-        # Recuperiamo la schedulazione di IERI per il controllo consecutività
+        # Recupera schedulazione di ieri (se esiste)
         yesterday_schedule = schedule[-1] if len(schedule) > 0 else None
         
         for shift_name in shift_types:
             candidates = []
             
             for name, data in staff_data.items():
-                # 1. Ferie
-                if current_day in data['ferie']: continue
-                # 2. Indisponibilità
-                if current_day in data['indisponibilita']: continue
-                # 3. Target Raggiunto
+                # 1. Target Raggiunto?
                 if work_counts[name] >= targets[name]: continue
-                # 4. Già lavorato oggi (niente doppi turni)
+                
+                # 2. Già lavorato oggi?
                 if name in worked_today: continue
                 
-                # 5. CONTROLLO CONSECUTIVITÀ (Nuova Logica)
-                # Se ieri hai fatto "Mattina", oggi non puoi fare "Mattina".
-                if yesterday_schedule:
-                    # Controlliamo se ieri, in QUESTO turno specifico, c'era questa persona
+                # 3. CONTROLLO CONSECUTIVITÀ (OPZIONALE)
+                if prevent_consecutive and yesterday_schedule:
+                    # Se ieri in questo turno c'era questa persona, saltala
                     if yesterday_schedule.get(shift_name) == name:
                         continue
                 
                 candidates.append(name)
             
-            selected_person = "SCOPERTO"
+            selected_person = "SCOPERTO" # Placeholder testuale
             
             if candidates:
-                # Ordina per chi ha lavorato meno
+                # Ordina per chi ha lavorato meno (equità)
                 candidates.sort(key=lambda x: work_counts[x])
                 
-                # Filtra i migliori
+                # Prendi i candidati con il minor numero di turni (random tra i migliori)
                 min_val = work_counts[candidates[0]]
                 best_candidates = [c for c in candidates if work_counts[c] == min_val]
                 
@@ -154,153 +157,153 @@ def export_to_pdf(dataframe, shift_cols):
     pdf.add_page()
     pdf.set_font("Helvetica", size=10)
     
-    # Intestazione Report
-    pdf.set_font("Helvetica", 'B', 16)
-    pdf.set_text_color(44, 62, 80) # Blu Navy
-    pdf.cell(0, 10, "PIANIFICAZIONE OPERATIVA TURNI", 0, 1, 'L')
-    pdf.set_font("Helvetica", 'I', 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 8, f"Generato il: {date.today().strftime('%d/%m/%Y')}", 0, 1, 'L')
+    # Intestazione
+    pdf.set_font("Helvetica", 'B', 14)
+    pdf.cell(0, 10, "PIANIFICAZIONE TURNI", 0, 1, 'L')
     pdf.ln(5)
     
-    # Calcoli Layout
+    # Setup Colonna
     page_width = 275
-    date_col_w = 30
-    day_col_w = 30
-    remaining_w = page_width - date_col_w - day_col_w
-    shift_col_w = remaining_w / len(shift_cols)
+    date_w = 35
+    day_w = 30
+    rem_w = page_width - date_w - day_w
+    shift_w = rem_w / len(shift_cols)
     
     # Header Tabella
-    pdf.set_fill_color(240, 240, 240) # Sfondo grigio chiaro header
+    pdf.set_fill_color(240, 240, 240)
     pdf.set_font("Helvetica", 'B', 9)
-    pdf.set_text_color(0, 0, 0)
-    
-    pdf.cell(date_col_w, 10, "DATA", 1, 0, 'C', True)
-    pdf.cell(day_col_w, 10, "GIORNO", 1, 0, 'C', True)
+    pdf.cell(date_w, 10, "DATA", 1, 0, 'C', True)
+    pdf.cell(day_w, 10, "GIORNO", 1, 0, 'C', True)
     for s in shift_cols:
         col_name = s.encode('latin-1', 'replace').decode('latin-1')
-        pdf.cell(shift_col_w, 10, col_name.upper(), 1, 0, 'C', True)
+        pdf.cell(shift_w, 10, col_name.upper(), 1, 0, 'C', True)
     pdf.ln()
     
-    # Body
+    # Dati
     pdf.set_font("Helvetica", size=9)
     for _, row in dataframe.iterrows():
-        d_str = row['Data'].strftime('%d/%m')
-        day_str = row['Giorno'].encode('latin-1', 'replace').decode('latin-1')
+        # Gestione date (se è datetime o stringa modificata)
+        try:
+            d_str = row['Data'].strftime('%d/%m/%Y')
+        except:
+            d_str = str(row['Data'])
+            
+        day_str = str(row['Giorno']).encode('latin-1', 'replace').decode('latin-1')
         
-        pdf.cell(date_col_w, 10, d_str, 1, 0, 'C')
-        pdf.cell(day_col_w, 10, day_str, 1, 0, 'C')
+        pdf.cell(date_w, 10, d_str, 1, 0, 'C')
+        pdf.cell(day_w, 10, day_str, 1, 0, 'C')
         
         for s in shift_cols:
-            person = str(row[s])
-            person_enc = person.encode('latin-1', 'replace').decode('latin-1')
+            val = str(row[s])
+            val_enc = val.encode('latin-1', 'replace').decode('latin-1')
             
-            if person == "SCOPERTO":
-                pdf.set_text_color(220, 53, 69) # Rosso Bootstrap
+            # Evidenzia SCOPERTO in rosso nel PDF
+            if val == "SCOPERTO":
+                pdf.set_text_color(180, 0, 0)
                 pdf.set_font("Helvetica", 'B', 9)
             else:
                 pdf.set_text_color(0, 0, 0)
                 pdf.set_font("Helvetica", size=9)
                 
-            pdf.cell(shift_col_w, 10, person_enc, 1, 0, 'C')
+            pdf.cell(shift_w, 10, val_enc, 1, 0, 'C')
             
         pdf.set_text_color(0, 0, 0)
         pdf.ln()
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- SIDEBAR CONFIGURAZIONE ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("⚙️ Impostazioni")
+    st.header("Impostazioni")
     
-    st.markdown("##### 1. Periodo")
+    st.subheader("Periodo")
     start_date = st.date_input("Data Inizio", date.today())
-    duration = st.number_input("Giorni totali", 7, 365, 30)
+    duration = st.number_input("Giorni totali", 1, 365, 30)
     
-    st.markdown("##### 2. Turni")
-    shifts_input = st.text_input("Tipologie (es. Mattina, Sera)", "Mattina, Pomeriggio")
+    st.subheader("Turni")
+    shifts_input = st.text_input("Nomi Turni (separati da virgola)", "Mattina, Pomeriggio")
     shift_types = [s.strip() for s in shifts_input.split(',') if s.strip()]
     
-    st.markdown("##### 3. Team")
-    staff_input = st.text_area("Elenco Dipendenti", "Rossi\nBianchi\nVerdi\nNeri")
-    staff_names = [x.strip() for x in staff_input.split('\n') if x.strip()]
+    st.subheader("Regole")
+    prevent_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True, help="Se attivo, chi fa Mattina oggi non farà Mattina domani.")
     
-    st.info("ℹ️ Il sistema evita che un dipendente faccia lo stesso turno per 2 giorni consecutivi.")
+    st.subheader("Risorse")
+    staff_input = st.text_area("Lista Dipendenti", "Rossi\nBianchi\nVerdi\nNeri")
+    staff_names = [x.strip() for x in staff_input.split('\n') if x.strip()]
 
-# --- MAIN LAYOUT ---
-st.title("Gestione Turni Aziendali")
-st.markdown("Strumento professionale per la generazione automatica dei turni operativi.")
-st.markdown("---")
+# --- MAIN ---
+st.title("Gestione Turni")
 
 if not staff_names or not shift_types:
-    st.warning("⚠️ Configurare il personale e i turni nella barra laterale per procedere.")
+    st.warning("Compilare le impostazioni nella barra laterale per procedere.")
     st.stop()
 
-# --- INPUT DIPENDENTI (GRID LAYOUT) ---
-st.subheader("Parametri Risorse Umane")
+# --- CONFIGURAZIONE RIPOSI ---
+st.subheader("Configurazione Riposi")
+st.caption("Indicare i giorni di riposo settimanali desiderati per ogni risorsa.")
+
 staff_data = {}
-cols = st.columns(3) # Layout a 3 colonne per professionalità
-
-date_range = generate_date_range(start_date, duration)
-
+cols = st.columns(3)
 for i, name in enumerate(staff_names):
     with cols[i % 3]:
-        with st.expander(f"👤 {name}", expanded=False):
-            w_rest = st.number_input(f"Riposi settimanali", 0, 7, 1, key=f"wr_{name}")
-            leaves = st.multiselect("Ferie / Malattia", date_range, format_func=lambda x: x.strftime('%d/%m'), key=f"lv_{name}")
-            unavail = st.multiselect("Indisponibilità", [d for d in date_range if d not in leaves], format_func=lambda x: x.strftime('%d/%m'), key=f"un_{name}")
-            staff_data[name] = {'weekly_rest': w_rest, 'ferie': leaves, 'indisponibilita': unavail}
+        # Minimal input: solo riposi
+        w_rest = st.number_input(f"{name}", 0, 7, 2, key=f"wr_{name}")
+        staff_data[name] = {'weekly_rest': w_rest}
 
 st.markdown("---")
 
 # --- GENERAZIONE ---
-if st.button("Genera Pianificazione", type="primary", use_container_width=True):
+if st.button("Genera Bozza Turni", type="primary"):
+    date_range = generate_date_range(start_date, duration)
     
-    # Processo
-    schedule = generate_schedule(staff_data, date_range, shift_types)
-    df = pd.DataFrame(schedule)
+    # Calcolo algoritmo
+    schedule_data = generate_schedule(staff_data, date_range, shift_types, prevent_consecutive)
     
-    # Localizzazione
+    # Creazione DataFrame
+    df = pd.DataFrame(schedule_data)
+    
+    # Traduzione Giorni
     it_days = {'Monday': 'Lunedì', 'Tuesday': 'Martedì', 'Wednesday': 'Mercoledì', 
                'Thursday': 'Giovedì', 'Friday': 'Venerdì', 'Saturday': 'Sabato', 'Sunday': 'Domenica'}
     df['Giorno'] = df['Giorno'].map(it_days)
     
-    # Clean Columns
+    # Ordine Colonne
     cols_order = ['Data', 'Giorno'] + shift_types
     df = df[cols_order]
-
-    # --- OUTPUT VISIVO ---
-    st.subheader("🗓️ Calendario Turni")
     
-    # Funzione Stile Tabella
-    def style_schedule(val):
-        if val == "SCOPERTO":
-            return 'background-color: #fee2e2; color: #b91c1c; font-weight: bold; border: 1px solid #fecaca;' # Rosso professionale
-        return 'color: #374151;'
+    # Salvataggio in session_state
+    st.session_state.schedule_df = df
 
-    st.dataframe(
-        df.style.map(style_schedule),
+# --- VISUALIZZAZIONE E MODIFICA ---
+if st.session_state.schedule_df is not None:
+    st.subheader("Pianificazione Operativa (Modificabile)")
+    st.caption("Clicca sulle celle per modificare manualmente le assegnazioni.")
+    
+    # Data Editor: permette all'utente di modificare la tabella
+    edited_df = st.data_editor(
+        st.session_state.schedule_df,
         use_container_width=True,
         height=600,
         column_config={
-            "Data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
+            "Data": st.column_config.DateColumn("Data", format="DD/MM/YYYY", disabled=True),
+            "Giorno": st.column_config.TextColumn("Giorno", disabled=True),
         },
-        hide_index=True
+        num_rows="fixed"
     )
     
-    # --- OUTPUT PDF ---
     st.markdown("### Esportazione")
-    col_pdf, _ = st.columns([1, 4])
+    col_pdf, _ = st.columns([1, 5])
     
     with col_pdf:
         try:
-            pdf_bytes = export_to_pdf(df, shift_types)
+            # Genera il PDF basandosi su EDITED_DF (quindi include le modifiche manuali)
+            pdf_bytes = export_to_pdf(edited_df, shift_types)
             st.download_button(
-                label="📄 Scarica Report PDF",
+                label="Scarica PDF Definitivo",
                 data=pdf_bytes,
-                file_name="Report_Turni.pdf",
+                file_name="Piano_Turni.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         except Exception as e:
-            st.error(f"Errore nella generazione del PDF: {e}")
+            st.error(f"Errore generazione PDF: {e}")
