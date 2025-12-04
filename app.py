@@ -1,171 +1,199 @@
 import streamlit as st
 import pandas as pd
 import random
-import calendar
 from datetime import date, timedelta
+import math
 
-# --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Gestore Turni Intelligente", layout="wide")
+# --- CONFIGURAZIONE PAGINA (SPATIAL UI) ---
+st.set_page_config(
+    page_title="TurniMaster 3000",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- CSS PERSONALIZZATO PER LOOK "SPAZIALE" ---
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    .metric-card {
+        background-color: #262730;
+        border: 1px solid #41424C;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+    }
+    h1, h2, h3 {
+        color: #00e5ff !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- FUNZIONI DI UTILITÀ ---
-def get_month_days(year, month):
-    num_days = calendar.monthrange(year, month)[1]
-    days = [date(year, month, day) for day in range(1, num_days + 1)]
-    return days
+def generate_date_range(start_date, num_days):
+    return [start_date + timedelta(days=i) for i in range(num_days)]
 
-def generate_schedule(staff_data, year, month, days_list):
-    schedule = {}
+def calculate_work_target(total_days, weekly_rest, vacation_days_count):
+    # Calcolo proporzionale: (Giorni totali / 7) * Riposi settimanali
+    weeks_covered = total_days / 7
+    total_rest_needed = round(weeks_covered * weekly_rest)
     
-    # Inizializza contatori turni per ogni persona
+    # Target Lavorativi = Totale Giorni - Riposi Calcolati - Ferie Specificate
+    work_target = total_days - total_rest_needed - vacation_days_count
+    return max(0, work_target), total_rest_needed
+
+def generate_schedule(staff_data, date_list):
+    schedule = []
+    
+    # Inizializza contatori
     work_counts = {name: 0 for name in staff_data.keys()}
     
-    # Determina il target di turni lavorativi (Giorni totali - Giorni riposo richiesti)
-    work_targets = {
-        name: len(days_list) - data['target_riposi'] - len(data['ferie']) 
-        for name, data in staff_data.items()
-    }
+    # Calcolo obiettivi per ogni persona
+    targets = {}
+    for name, data in staff_data.items():
+        work_target, rest_calc = calculate_work_target(
+            len(date_list), 
+            data['weekly_rest'], 
+            len(data['ferie'])
+        )
+        targets[name] = work_target
 
-    for current_day in days_list:
+    for current_day in date_list:
         day_str = current_day.strftime("%Y-%m-%d")
         candidates = []
         
-        # 1. Filtra chi può lavorare
         for name, data in staff_data.items():
-            # Se è in ferie/malattia, salta
+            # 1. Controllo Ferie (Malattia/Ferie)
             if current_day in data['ferie']:
                 continue
             
-            # Se ha segnato indisponibilità specifica per oggi, salta
+            # 2. Controllo Indisponibilità (Non posso, ma non è ferie)
             if current_day in data['indisponibilita']:
                 continue
             
-            # Se ha già raggiunto il massimo dei turni lavorabili (basato sui riposi chiesti), salta
-            if work_counts[name] >= work_targets[name]:
+            # 3. Controllo Target Lavorativo
+            if work_counts[name] >= targets[name]:
                 continue
                 
             candidates.append(name)
         
-        # 2. Assegnazione Turno
+        # Selezione
         if candidates:
-            # Ordina i candidati in base a chi ha lavorato meno per equità
+            # Ordina per chi ha lavorato meno (Equity) e aggiungi casualità
             candidates.sort(key=lambda x: work_counts[x])
+            min_shifts = work_counts[candidates[0]]
+            best_options = [c for c in candidates if work_counts[c] == min_shifts]
             
-            # Prendi i primi N necessari (qui assumiamo 1 persona per turno, modificabile)
-            # Introduciamo un minimo di casualità tra chi ha gli stessi turni per variare
-            min_work = work_counts[candidates[0]]
-            best_candidates = [c for c in candidates if work_counts[c] == min_work]
-            chosen_one = random.choice(best_candidates)
-            
-            schedule[day_str] = chosen_one
-            work_counts[chosen_one] += 1
+            chosen = random.choice(best_options)
+            work_counts[chosen] += 1
+            status = chosen
         else:
-            schedule[day_str] = "⚠️ SCOPERTO"
+            status = "⚠️ SCOPERTO"
             
-    return schedule, work_counts
+        schedule.append({
+            "Data": current_day,
+            "Giorno": current_day.strftime("%A"), # Nome giorno (es. Monday)
+            "Assegnato": status
+        })
+            
+    return schedule, work_counts, targets
 
-# --- INTERFACCIA GRAFICA ---
-
-st.title("📅 Generatore Turni & Gestione Staff")
-st.markdown("---")
-
-# 1. SIDEBAR: Configurazione Generale
+# --- SIDEBAR CONFIGURAZIONE ---
 with st.sidebar:
-    st.header("⚙️ Impostazioni")
-    year = st.number_input("Anno", min_value=2024, max_value=2030, value=2024)
-    month = st.selectbox("Mese", range(1, 13), index=date.today().month - 1)
+    st.title("🛸 Configurazione")
     
-    st.subheader("👥 Lista Dipendenti")
-    staff_input = st.text_area("Inserisci i nomi (uno per riga)", "Mario\nLuigi\nAnna\nGiulia")
+    st.subheader("1. Periodo Temporale")
+    start_date = st.date_input("Data Inizio", date.today())
+    duration_days = st.number_input("Durata (Giorni)", min_value=1, value=30, step=1)
+    
+    date_range = generate_date_range(start_date, duration_days)
+    end_date = date_range[-1]
+    
+    st.info(f"🗓️ Dal: **{start_date.strftime('%d/%m')}**\n\nAl: **{end_date.strftime('%d/%m')}**")
+    
+    st.subheader("2. Squadra")
+    staff_input = st.text_area("Nomi Staff (uno per riga)", "Mario\nLuigi\nPeach\nToad")
     staff_names = [x.strip() for x in staff_input.split('\n') if x.strip()]
 
-# Calcola i giorni del mese selezionato
-days_list = get_month_days(year, month)
-days_formatted = [d.strftime("%Y-%m-%d") for d in days_list]
+# --- MAIN INTERFACE ---
+st.title("🚀 TurniMaster Space Edition")
+st.markdown("Generatore di turni con calcolo proporzionale dei riposi.")
 
-# 2. MAIN: Configurazione Dettagliata per Ogni Dipendente
-st.subheader("📝 Dettagli Dipendenti")
-st.info("Configura qui sotto le ferie, le indisponibilità specifiche e i giorni di riposo desiderati per ogni persona.")
+if not staff_names:
+    st.warning("Inserisci almeno un nome nella barra laterale!")
+    st.stop()
 
+# --- INPUT DETTAGLI (Layout a griglia) ---
+st.subheader("⚙️ Parametri Staff")
 staff_data = {}
 
-# Creiamo un container espandibile per ogni dipendente per mantenere l'interfaccia pulita
+# Usiamo i tabs per salvare spazio se sono tanti, o expander
 for name in staff_names:
-    with st.expander(f"Configurazione per **{name}**", expanded=False):
-        col1, col2, col3 = st.columns(3)
+    with st.expander(f"👤 Configura: {name}", expanded=False):
+        c1, c2, c3 = st.columns([1, 2, 2])
         
-        with col1:
-            # Input Ferie/Malattia
+        with c1:
+            st.markdown(f"**{name}**")
+            # Riposi settimanali
+            weekly_rest = st.number_input(
+                f"Riposi a Settimana", 
+                min_value=0, max_value=7, value=2, 
+                key=f"rest_{name}",
+                help="Quanti giorni di riposo a settimana deve avere?"
+            )
+            # Preview calcolo
+            weeks = duration_days / 7
+            total_rest = round(weeks * weekly_rest)
+            st.caption(f"Su {duration_days} giorni ≈ **{total_rest}** riposi totali.")
+
+        with c2:
+            # Ferie / Malattia (Questi giorni vengono SOTTRATTI dal monte ore lavorabile)
             leaves = st.multiselect(
-                f"🌴 Ferie/Malattia ({name})",
-                options=days_list,
-                format_func=lambda x: x.strftime('%d/%m'),
-                key=f"ferie_{name}"
+                "🤒 Ferie / Malattia (Assenze Giustificate)",
+                options=date_range,
+                format_func=lambda x: x.strftime('%d/%m %a'),
+                key=f"leaves_{name}"
             )
-            
-        with col2:
-            # Input Indisponibilità (non sono ferie, ma giorni in cui preferisce non lavorare)
+
+        with c3:
+            # Indisponibilità (Non posso lavorare, ma devo recuperare il turno altrove)
             unavailable = st.multiselect(
-                f"🚫 Indisponibilità Specifica ({name})",
-                options=[d for d in days_list if d not in leaves], # Escludiamo i giorni già segnati come ferie
-                format_func=lambda x: x.strftime('%d/%m'),
-                key=f"indisp_{name}"
-            )
-            
-        with col3:
-            # Giorni di riposo target
-            # Default: 8 giorni (es. 2 a settimana)
-            rest_days = st.number_input(
-                f"🛌 Giorni di Riposo Obiettivo ({name})",
-                min_value=0, 
-                max_value=len(days_list), 
-                value=8,
-                key=f"riposo_{name}"
+                "🚫 Indisponibilità (Preferenze)",
+                options=[d for d in date_range if d not in leaves],
+                format_func=lambda x: x.strftime('%d/%m %a'),
+                key=f"unav_{name}"
             )
             
         staff_data[name] = {
+            'weekly_rest': weekly_rest,
             'ferie': leaves,
-            'indisponibilita': unavailable,
-            'target_riposi': rest_days
+            'indisponibilita': unavailable
         }
 
 st.markdown("---")
 
-# 3. GENERAZIONE
-if st.button("🚀 Genera Turni", type="primary", use_container_width=True):
-    with st.spinner("Elaborazione turni in corso..."):
-        schedule_dict, stats = generate_schedule(staff_data, year, month, days_list)
+# --- GENERAZIONE ---
+if st.button("✨ CALCOLA TURNI INTERSTELLARI", type="primary", use_container_width=True):
+    
+    final_schedule, worked_stats, target_stats = generate_schedule(staff_data, date_range)
+    
+    # DataFrame
+    df = pd.DataFrame(final_schedule)
+    # Traduciamo i giorni in italiano per bellezza (opzionale, ma carino)
+    days_map = {
+        'Monday': 'Lunedì', 'Tuesday': 'Martedì', 'Wednesday': 'Mercoledì',
+        'Thursday': 'Giovedì', 'Friday': 'Venerdì', 'Saturday': 'Sabato', 'Sunday': 'Domenica'
+    }
+    df['Giorno'] = df['Giorno'].map(days_map)
+
+    # --- VISUALIZZAZIONE RISULTATI ---
+    
+    col_left, col_right = st.columns([2, 1])
+
+    with col_left:
+        st.subheader("🗓️ Calendario Operativo")
         
-        # Creazione DataFrame per visualizzazione
-        df_schedule = pd.DataFrame(list(schedule_dict.items()), columns=['Data', 'Dipendente Assegnato'])
-        df_schedule['Data'] = pd.to_datetime(df_schedule['Data'])
-        df_schedule['Giorno'] = df_schedule['Data'].dt.day_name()
-        
-        # Riordina colonne
-        df_schedule = df_schedule[['Data', 'Giorno', 'Dipendente Assegnato']]
-        
-        # --- RISULTATI ---
-        col_res1, col_res2 = st.columns([2, 1])
-        
-        with col_res1:
-            st.subheader("🗓️ Calendario Turni")
-            # Evidenzia righe scoperte
-            def highlight_uncovered(s):
-                return ['background-color: #ffcccc' if v == "⚠️ SCOPERTO" else '' for v in s]
-            
-            st.dataframe(
-                df_schedule.style.apply(highlight_uncovered, axis=1), 
-                use_container_width=True,
-                height=500
-            )
-            
-        with col_res2:
-            st.subheader("📊 Statistiche")
-            df_stats = pd.DataFrame(list(stats.items()), columns=['Dipendente', 'Giorni Lavorati'])
-            st.dataframe(df_stats, use_container_width=True, hide_index=True)
-            
-            st.download_button(
-                label="📥 Scarica come CSV",
-                data=df_schedule.to_csv(index=False).encode('utf-8'),
-                file_name=f'turni_{year}_{month}.csv',
-                mime='text/csv',
-            )
+        # Funzione per colorare le righe
