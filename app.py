@@ -121,4 +121,12 @@ if st.button("🚀 GENERA TURNI", type="primary", use_container_width=True):
         pdf.cell(35, 10, "Data", 1, 0, 'C', True)
         pdf.cell(30, 10, "Giorno", 1, 0, 'C', True)
         pdf.cell(40, 10, "Turno", 1, 0, 'C', True)
-        pdf.cell(0
+        pdf.cell(0, str(row['Dipendente']), 1, 1)
+            
+        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
+        b64 = base64.b64encode(pdf_bytes).decode()
+        href = f'<br><a href="data:application/octet-stream;base64,{b64}" download="Turni.pdf" style="background-color:green; color:white; padding:10px; text-decoration:none;">SCARICA PDF</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        
+    except Exception as e:
+        st.error(f"Errore PDF: {e}")
