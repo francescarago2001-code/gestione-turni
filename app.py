@@ -3,112 +3,134 @@ import pandas as pd
 import random
 from fpdf import FPDF
 import base64
+from datetime import timedelta, date
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Gestore Turni Pro", layout="centered")
+st.set_page_config(page_title="Gestore Turni Pro", layout="wide")
 
-# --- 1. RECUPERO DATI DALLA "CASSAFORTE" (SECRETS) ---
-# Se non ci sono segreti impostati, usiamo valori di prova per non far rompere l'app
+# --- 1. RECUPERO DIPENDENTI (MEMORIA CONDIVISA) ---
+# I nomi devono essere inseriti nei "Secrets" di Streamlit per essere fissi su tutti i dispositivi.
 try:
-    USER_SEGRETO = st.secrets["username"]
-    PASS_SEGRETO = st.secrets["password"]
-    # Recuperiamo la lista dipendenti come stringa e la trasformiamo in lista
+    # Se nei secrets c'è scritto: dipendenti = "Gino, Pino, Tino"
     DIPENDENTI_BASE = st.secrets["dipendenti"].split(",")
+    AZIENDA = st.secrets.get("azienda", "La Mia Azienda")
 except:
-    st.error("⚠️ Configurazione mancante! Imposta i Secrets nella dashboard di Streamlit.")
-    st.stop()
+    # Fallback se non hai ancora impostato i secrets
+    DIPENDENTI_BASE = ["Inserisci i nomi", "nei Secrets", "di Streamlit"]
+    AZIENDA = "Azienda Demo"
 
-# --- 2. GESTIONE LOGIN ---
-def check_login():
-    if 'logged_in' not in st.session_state:
-        st.session_state.logged_in = False
+# Pulizia spazi vuoti nei nomi
+lista_dipendenti = [x.strip() for x in DIPENDENTI_BASE if x.strip()]
 
-    if not st.session_state.logged_in:
-        st.title("🔐 Accesso Riservato")
-        user = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Entra"):
-            # Confronta con i dati nella cassaforte
-            if user == USER_SEGRETO and password == PASS_SEGRETO: 
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Credenziali errate")
-        return False
-    return True
+# --- TITOLO ---
+st.title(f"📅 Pianificazione Turni: {AZIENDA}")
 
-if not check_login():
-    st.stop()
+# --- 2. IMPOSTAZIONI CALENDARIO E TURNI ---
+st.sidebar.header("⚙️ Impostazioni")
 
-# --- INTERFACCIA PRINCIPALE ---
-st.title(f"📅 Turni: {st.secrets.get('azienda', 'Generico')}")
-st.sidebar.button("Esci", on_click=lambda: st.session_state.update(logged_in=False))
-
-# --- 3. IMPOSTAZIONI ---
-st.header("1. Configurazione")
+# Selezione Date (Calendario vero)
 col1, col2 = st.columns(2)
 with col1:
-    giorni_lavorativi = st.multiselect(
-        "Giorni di lavoro:",
-        ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"],
-        default=["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì"]
-    )
+    data_inizio = st.date_input("Data Inizio", date.today())
 with col2:
-    periodo = st.radio("Durata", ["Settimanale", "Mensile"])
+    data_fine = st.date_input("Data Fine", date.today() + timedelta(days=6))
 
-# --- 4. DIPENDENTI (CARICATI DAI SECRETS) ---
-st.header("2. Dipendenti")
-# Qui mostriamo i dipendenti caricati dai Secrets, ma permettiamo di aggiungerne temporaneamente
-nomi_input = st.text_area(
-    "Modifica lista per questa sessione (i salvataggi fissi li fa l'amministratore)", 
-    ", ".join(DIPENDENTI_BASE)
+# Selezione Tipi di Turno
+turni_disponibili = st.multiselect(
+    "Quali turni vuoi coprire ogni giorno?",
+    ["Mattina", "Pomeriggio", "Notte", "Spezzato", "Extra"],
+    default=["Mattina", "Pomeriggio"]
 )
-lista_dipendenti = [x.strip() for x in nomi_input.split(',') if x.strip()]
 
-# --- 5. INDISPONIBILITÀ ---
-st.header("3. Indisponibilità")
+# --- 3. GESTIONE DIPENDENTI ---
+st.subheader("👥 Dipendenti (Caricati dal server)")
+st.write(f"Dipendenti attivi: **{', '.join(lista_dipendenti)}**")
+st.info("💡 Per aggiungere o togliere dipendenti in modo permanente, contatta l'amministratore del software.")
+
+# --- 4. INDISPONIBILITÀ ---
+# Semplifichiamo: permettiamo di scegliere i giorni della settimana in cui uno non può lavorare
+st.subheader("🚫 Indisponibilità Ricorrenti")
+giorni_settimana = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
 indisponibilita = {}
-if lista_dipendenti:
-    with st.expander("Segna chi NON può lavorare"):
-        for dip in lista_dipendenti:
-            indisponibilita[dip] = st.multiselect(f"No turno per {dip}", giorni_lavorativi)
 
-# --- 6. GENERA E SCARICA (LOGICA IDENTICA A PRIMA) ---
-if st.button("Genera Turni"):
-    if not lista_dipendenti:
-        st.error("Nessun dipendente inserito.")
+with st.expander("Apri per segnare i giorni di riposo fisso"):
+    for dip in lista_dipendenti:
+        # Crea una chiave unica per ogni widget
+        indisponibilita[dip] = st.multiselect(
+            f"Giorni di riposo per {dip}", 
+            giorni_settimana,
+            key=f"indisp_{dip}"
+        )
+
+# --- 5. GENERAZIONE TURNI ---
+if st.button("Genera Calendario Turni", type="primary"):
+    if not turni_disponibili:
+        st.error("Seleziona almeno un tipo di turno (es. Mattina).")
     else:
-        st.success("Fatto!")
-        moltiplicatore = 4 if "Mensile" in periodo else 1
-        giorni_finali = giorni_lavorativi * moltiplicatore
-        
-        schedule_data = []
-        for giorno in giorni_finali:
-            disponibili = [d for d in lista_dipendenti if giorno not in indisponibilita.get(d, [])]
-            turno = random.choice(disponibili) if disponibili else "NESSUNO"
-            schedule_data.append({"Giorno": giorno, "Dipendente": turno})
+        # Calcolo giorni totali
+        delta = data_fine - data_inizio
+        giorni_totali = []
+        for i in range(delta.days + 1):
+            giorni_totali.append(data_inizio + timedelta(days=i))
             
+        schedule_data = []
+        
+        # Algoritmo di assegnazione
+        for giorno_reale in giorni_totali:
+            nome_giorno = giorni_settimana[giorno_reale.weekday()] # Es: "Lunedì"
+            
+            for tipo_turno in turni_disponibili:
+                # Trova chi può lavorare quel giorno
+                # Un dipendente è disponibile se il "nome del giorno" (es. Lunedì) NON è nei suoi giorni di riposo
+                disponibili = [
+                    d for d in lista_dipendenti 
+                    if nome_giorno not in indisponibilita.get(d, [])
+                ]
+                
+                if not disponibili:
+                    assegnato = "NESSUNO DISPONIBILE"
+                else:
+                    # Scelta casuale tra i disponibili
+                    assegnato = random.choice(disponibili)
+                
+                schedule_data.append({
+                    "Data": giorno_reale.strftime("%d/%m/%Y"),
+                    "Giorno": nome_giorno,
+                    "Turno": tipo_turno,
+                    "Dipendente": assegnato
+                })
+        
+        # Mostra Tabella
         df = pd.DataFrame(schedule_data)
-        st.dataframe(df, use_container_width=True)
+        st.success("Turni generati con successo!")
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
-        # PDF Export
+        # --- 6. CREAZIONE PDF ---
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, txt=f"Turni - {st.secrets.get('azienda', '')}", ln=1, align='C')
+        pdf.set_font("Arial", size=14)
+        pdf.cell(0, 10, txt=f"Turni {AZIENDA}", ln=1, align='C')
+        pdf.set_font("Arial", size=10)
         pdf.ln(5)
         
-        pdf.set_font("Arial", size=10)
-        col_w = 90
-        pdf.cell(col_w, 10, "Giorno", 1)
-        pdf.cell(col_w, 10, "Dipendente", 1)
-        pdf.ln()
+        # Intestazioni tabella PDF
+        col_w_data = 35
+        col_w_giorno = 30
+        col_w_turno = 40
+        col_w_nome = 50
+        
+        pdf.set_fill_color(200, 220, 255)
+        pdf.cell(col_w_data, 10, "Data", 1, 0, 'C', 1)
+        pdf.cell(col_w_giorno, 10, "Giorno", 1, 0, 'C', 1)
+        pdf.cell(col_w_turno, 10, "Turno", 1, 0, 'C', 1)
+        pdf.cell(col_w_nome, 10, "Dipendente", 1, 1, 'C', 1)
         
         for _, row in df.iterrows():
-            pdf.cell(col_w, 10, str(row['Giorno']), 1)
-            pdf.cell(col_w, 10, str(row['Dipendente']), 1)
-            pdf.ln()
+            pdf.cell(col_w_data, 10, str(row['Data']), 1)
+            pdf.cell(col_w_giorno, 10, str(row['Giorno']), 1)
+            pdf.cell(col_w_turno, 10, str(row['Turno']), 1)
+            pdf.cell(col_w_nome, 10, str(row['Dipendente']), 1, 1)
             
         b64 = base64.b64encode(pdf.output(dest='S').encode('latin-1')).decode()
-        href = f'<a href="data:application/octet-stream;base64,{b64}" download="turni.pdf">📄 Scarica PDF</a>'
+        href = f'<a href="data:application/octet-stream;base64,{b64}" download="Calendario_Turni.pdf" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">📄 SCARICA PDF</a>'
         st.markdown(href, unsafe_allow_html=True)
