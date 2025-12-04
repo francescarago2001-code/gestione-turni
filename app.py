@@ -1,132 +1,171 @@
 import streamlit as st
 import pandas as pd
 import random
-import base64
-from datetime import timedelta, date
+import calendar
+from datetime import date, timedelta
 
-# --- PROVA A IMPORTARE FPDF (Se fallisce, avvisa l'utente) ---
-try:
-    from fpdf import FPDF
-except ImportError:
-    st.error("ERRORE GRAVE: Manca 'fpdf' nel file requirements.txt. Vai su GitHub e aggiungilo!")
-    st.stop()
+# --- CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Gestore Turni Intelligente", layout="wide")
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Gestore Turni", layout="wide")
+# --- FUNZIONI DI UTILITÀ ---
+def get_month_days(year, month):
+    num_days = calendar.monthrange(year, month)[1]
+    days = [date(year, month, day) for day in range(1, num_days + 1)]
+    return days
 
-# --- NOMI DI DEFAULT (Quelli che appaiono appena apri) ---
-# Modifica questa riga prima di vendere il software al cliente
-NOMI_BASE = "Mario, Luigi, Anna, Giovanni"
-
-st.title("📅 Gestore Turni Aziendali")
-
-# --- 1. INSERIMENTO DIPENDENTI ---
-st.write("---")
-col_inp, col_info = st.columns([2, 1])
-with col_inp:
-    st.subheader("1. Chi lavora?")
-    # L'utente può modificare la lista, ma parte con quella che hai deciso tu
-    nomi_text = st.text_area("Lista dipendenti (separati da virgola)", value=NOMI_BASE, height=70)
+def generate_schedule(staff_data, year, month, days_list):
+    schedule = {}
     
-    # Pulizia nomi
-    lista_dipendenti = [n.strip() for n in nomi_text.split(',') if n.strip()]
-
-with col_info:
-    st.info(f"Dipendenti rilevati: **{len(lista_dipendenti)}**")
-    if len(lista_dipendenti) == 0:
-        st.error("Inserisci almeno un nome!")
-        st.stop()
-
-# --- 2. CONFIGURAZIONE TURNI ---
-st.write("---")
-st.subheader("2. Impostazioni Calendario")
-
-c1, c2, c3 = st.columns(3)
-with c1:
-    d_inizio = st.date_input("Data Inizio", date.today())
-with c2:
-    d_fine = st.date_input("Data Fine", date.today() + timedelta(days=6))
-with c3:
-    tipi_turno = st.multiselect(
-        "Quali turni esistono?", 
-        ["Mattina", "Pomeriggio", "Notte", "Spezzato"],
-        default=["Mattina", "Pomeriggio"]
-    )
-
-if not tipi_turno:
-    st.error("Seleziona almeno un tipo di turno.")
-    st.stop()
-
-# --- 3. GESTIONE RIPOSI ---
-st.write("---")
-st.subheader("3. Giorni di Riposo")
-st.write("Seleziona i giorni in cui il dipendente **NON** può lavorare.")
-
-giorni_week = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-indisponibilita = {}
-
-cols = st.columns(4) # Griglia per occupare meno spazio
-for i, dip in enumerate(lista_dipendenti):
-    with cols[i % 4]:
-        indisponibilita[dip] = st.multiselect(f"Riposo {dip}", giorni_week, key=f"no_{i}")
-
-# --- 4. MOTORE GENERAZIONE ---
-st.write("---")
-if st.button("🚀 GENERA TURNI", type="primary", use_container_width=True):
+    # Inizializza contatori turni per ogni persona
+    work_counts = {name: 0 for name in staff_data.keys()}
     
-    delta = (d_fine - d_inizio).days + 1
-    dati_turni = []
+    # Determina il target di turni lavorativi (Giorni totali - Giorni riposo richiesti)
+    work_targets = {
+        name: len(days_list) - data['target_riposi'] - len(data['ferie']) 
+        for name, data in staff_data.items()
+    }
 
-    # Ciclo giorno per giorno
-    for i in range(delta):
-        giorno_corrente = d_inizio + timedelta(days=i)
-        nome_giorno = giorni_week[giorno_corrente.weekday()] # Es: Lunedì
+    for current_day in days_list:
+        day_str = current_day.strftime("%Y-%m-%d")
+        candidates = []
         
-        for turno in tipi_turno:
-            # Chi è disponibile oggi?
-            # Uno è disponibile se il nome del giorno NON è nella sua lista di riposi
-            disponibili = [
-                d for d in lista_dipendenti 
-                if nome_giorno not in indisponibilita.get(d, [])
-            ]
+        # 1. Filtra chi può lavorare
+        for name, data in staff_data.items():
+            # Se è in ferie/malattia, salta
+            if current_day in data['ferie']:
+                continue
             
-            if disponibili:
-                lavoratore = random.choice(disponibili)
-            else:
-                lavoratore = "⚠️ NESSUNO"
+            # Se ha segnato indisponibilità specifica per oggi, salta
+            if current_day in data['indisponibilita']:
+                continue
             
-            dati_turni.append({
-                "Data": giorno_corrente.strftime("%d/%m/%Y"),
-                "Giorno": nome_giorno,
-                "Turno": turno,
-                "Dipendente": lavoratore
-            })
+            # Se ha già raggiunto il massimo dei turni lavorabili (basato sui riposi chiesti), salta
+            if work_counts[name] >= work_targets[name]:
+                continue
+                
+            candidates.append(name)
+        
+        # 2. Assegnazione Turno
+        if candidates:
+            # Ordina i candidati in base a chi ha lavorato meno per equità
+            candidates.sort(key=lambda x: work_counts[x])
             
-    # --- VISUALIZZAZIONE ---
-    df = pd.DataFrame(dati_turni)
-    st.success("Turni generati con successo!")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+            # Prendi i primi N necessari (qui assumiamo 1 persona per turno, modificabile)
+            # Introduciamo un minimo di casualità tra chi ha gli stessi turni per variare
+            min_work = work_counts[candidates[0]]
+            best_candidates = [c for c in candidates if work_counts[c] == min_work]
+            chosen_one = random.choice(best_candidates)
+            
+            schedule[day_str] = chosen_one
+            work_counts[chosen_one] += 1
+        else:
+            schedule[day_str] = "⚠️ SCOPERTO"
+            
+    return schedule, work_counts
+
+# --- INTERFACCIA GRAFICA ---
+
+st.title("📅 Generatore Turni & Gestione Staff")
+st.markdown("---")
+
+# 1. SIDEBAR: Configurazione Generale
+with st.sidebar:
+    st.header("⚙️ Impostazioni")
+    year = st.number_input("Anno", min_value=2024, max_value=2030, value=2024)
+    month = st.selectbox("Mese", range(1, 13), index=date.today().month - 1)
     
-    # --- CREAZIONE PDF ---
-    try:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, "Tabella Turni", ln=1, align='C')
-        pdf.ln(10)
+    st.subheader("👥 Lista Dipendenti")
+    staff_input = st.text_area("Inserisci i nomi (uno per riga)", "Mario\nLuigi\nAnna\nGiulia")
+    staff_names = [x.strip() for x in staff_input.split('\n') if x.strip()]
+
+# Calcola i giorni del mese selezionato
+days_list = get_month_days(year, month)
+days_formatted = [d.strftime("%Y-%m-%d") for d in days_list]
+
+# 2. MAIN: Configurazione Dettagliata per Ogni Dipendente
+st.subheader("📝 Dettagli Dipendenti")
+st.info("Configura qui sotto le ferie, le indisponibilità specifiche e i giorni di riposo desiderati per ogni persona.")
+
+staff_data = {}
+
+# Creiamo un container espandibile per ogni dipendente per mantenere l'interfaccia pulita
+for name in staff_names:
+    with st.expander(f"Configurazione per **{name}**", expanded=False):
+        col1, col2, col3 = st.columns(3)
         
-        pdf.set_font("Arial", size=10)
-        # Intestazione
-        pdf.set_fill_color(200, 220, 255)
-        pdf.cell(35, 10, "Data", 1, 0, 'C', True)
-        pdf.cell(30, 10, "Giorno", 1, 0, 'C', True)
-        pdf.cell(40, 10, "Turno", 1, 0, 'C', True)
-        pdf.cell(0, str(row['Dipendente']), 1, 1)
+        with col1:
+            # Input Ferie/Malattia
+            leaves = st.multiselect(
+                f"🌴 Ferie/Malattia ({name})",
+                options=days_list,
+                format_func=lambda x: x.strftime('%d/%m'),
+                key=f"ferie_{name}"
+            )
             
-        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
-        b64 = base64.b64encode(pdf_bytes).decode()
-        href = f'<br><a href="data:application/octet-stream;base64,{b64}" download="Turni.pdf" style="background-color:green; color:white; padding:10px; text-decoration:none;">SCARICA PDF</a>'
-        st.markdown(href, unsafe_allow_html=True)
+        with col2:
+            # Input Indisponibilità (non sono ferie, ma giorni in cui preferisce non lavorare)
+            unavailable = st.multiselect(
+                f"🚫 Indisponibilità Specifica ({name})",
+                options=[d for d in days_list if d not in leaves], # Escludiamo i giorni già segnati come ferie
+                format_func=lambda x: x.strftime('%d/%m'),
+                key=f"indisp_{name}"
+            )
+            
+        with col3:
+            # Giorni di riposo target
+            # Default: 8 giorni (es. 2 a settimana)
+            rest_days = st.number_input(
+                f"🛌 Giorni di Riposo Obiettivo ({name})",
+                min_value=0, 
+                max_value=len(days_list), 
+                value=8,
+                key=f"riposo_{name}"
+            )
+            
+        staff_data[name] = {
+            'ferie': leaves,
+            'indisponibilita': unavailable,
+            'target_riposi': rest_days
+        }
+
+st.markdown("---")
+
+# 3. GENERAZIONE
+if st.button("🚀 Genera Turni", type="primary", use_container_width=True):
+    with st.spinner("Elaborazione turni in corso..."):
+        schedule_dict, stats = generate_schedule(staff_data, year, month, days_list)
         
-    except Exception as e:
-        st.error(f"Errore PDF: {e}")
+        # Creazione DataFrame per visualizzazione
+        df_schedule = pd.DataFrame(list(schedule_dict.items()), columns=['Data', 'Dipendente Assegnato'])
+        df_schedule['Data'] = pd.to_datetime(df_schedule['Data'])
+        df_schedule['Giorno'] = df_schedule['Data'].dt.day_name()
+        
+        # Riordina colonne
+        df_schedule = df_schedule[['Data', 'Giorno', 'Dipendente Assegnato']]
+        
+        # --- RISULTATI ---
+        col_res1, col_res2 = st.columns([2, 1])
+        
+        with col_res1:
+            st.subheader("🗓️ Calendario Turni")
+            # Evidenzia righe scoperte
+            def highlight_uncovered(s):
+                return ['background-color: #ffcccc' if v == "⚠️ SCOPERTO" else '' for v in s]
+            
+            st.dataframe(
+                df_schedule.style.apply(highlight_uncovered, axis=1), 
+                use_container_width=True,
+                height=500
+            )
+            
+        with col_res2:
+            st.subheader("📊 Statistiche")
+            df_stats = pd.DataFrame(list(stats.items()), columns=['Dipendente', 'Giorni Lavorati'])
+            st.dataframe(df_stats, use_container_width=True, hide_index=True)
+            
+            st.download_button(
+                label="📥 Scarica come CSV",
+                data=df_schedule.to_csv(index=False).encode('utf-8'),
+                file_name=f'turni_{year}_{month}.csv',
+                mime='text/csv',
+            )
