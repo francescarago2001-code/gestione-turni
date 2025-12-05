@@ -37,7 +37,7 @@ def check_trial_status():
             data = json.load(f)
         start_date = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
     except:
-        # Se il file è corrotto, lo resetto (o blocchi, a tua scelta)
+        # Se il file è corrotto, resettiamo a oggi (o blocchiamo, qui resettiamo per sicurezza)
         return False, 0, today
 
     # Calcolo giorni trascorsi
@@ -58,71 +58,4 @@ st.markdown("""
     /* Reset e Font */
     .stApp {
         background-color: #ffffff;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        color: #333333;
-    }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #e9ecef;
-    }
-    
-    /* Intestazioni */
-    h1, h2, h3 {
-        color: #2c3e50 !important;
-        font-weight: 500;
-        letter-spacing: -0.5px;
-    }
-    
-    /* Bottoni */
-    .stButton>button {
-        background-color: #2c3e50; /* Blu Scuro */
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 0.6rem 1.2rem;
-        font-weight: 500;
-        width: 100%;
-        transition: background 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #1a252f;
-    }
-    
-    /* Expander e Input */
-    .streamlit-expanderHeader {
-        background-color: #ffffff;
-        color: #495057;
-        font-size: 14px;
-    }
-    div[data-baseweb="input"] {
-        border-radius: 4px;
-    }
-    
-    /* Messaggi */
-    .stAlert {
-        border: 1px solid #dee2e6;
-        background-color: #f8f9fa;
-        color: #333;
-    }
-    
-    /* Blocco Pagamento */
-    .payment-container {
-        text-align: center;
-        padding: 50px;
-        border: 2px solid #e74c3c;
-        border-radius: 10px;
-        background-color: #fdf2f2;
-        margin-top: 50px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- BLOCCO SOFTWARE SE PROVA SCADUTA ---
-if not trial_active:
-    st.markdown(f"""
-    <div class="payment-container">
-        <h1 style="color: #c0392b !important;">🚫 Periodo di Prova Scaduto</h1>
-        <p style="font-size: 18px;">I tuoi {TRIAL_DAYS} giorni di prova gratuita sono terminati.</p>
-        <p>Per continuare a generare turni e utilizzare il software, è necessario acquistare una licenza completa.</p>
+        font-family: 'Helvetica Neue', Helvetica
