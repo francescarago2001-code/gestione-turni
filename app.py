@@ -36,7 +36,7 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "TOTAL BLUE - SLIDER FIX" ---
+# --- 3. CSS "TOTAL BLUE - SLIDER NUCLEAR FIX" ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
@@ -60,28 +60,34 @@ st.markdown("""
         border-right: 1px solid #e2e8f0;
     }
 
-    /* --- SLIDER FIX (IL PROBLEMA ERA QUI) --- */
+    /* --- SLIDER FIX (MODALITÀ AGGRESSIVA) --- */
     
-    /* 1. Il numero sopra lo slider (Valore) */
+    /* 1. Il numero (Valore) sopra lo slider */
+    div[data-testid="stSlider"] label + div {
+        color: var(--primary-blue) !important;
+    }
     div[data-testid="stSlider"] div[data-baseweb="slider"] div {
         color: var(--primary-blue) !important; 
-        font-weight: 800 !important; /* Molto grassetto */
-        font-size: 1.1rem !important; /* Più grande */
+        font-weight: 700 !important;
     }
     
-    /* 2. La barra piena (Track) - Forza il blu sopra il rosso di default */
-    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {
-        background-color: var(--primary-blue) !important;
-    }
-    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"] {
+    /* 2. La barra piena (Track filled) - Cerca il rosso e lo uccide */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"],
+    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"],
+    div[data-baseweb="slider"] div[style*="background-color: #F63366"] {
         background-color: var(--primary-blue) !important;
     }
     
-    /* 3. Il pallino (Thumb) */
+    /* 3. Fallback generico per la barra piena */
+    div[data-baseweb="slider"] > div > div > div > div:first-child {
+        background-color: var(--primary-blue) !important;
+    }
+    
+    /* 4. Il pallino (Thumb) */
     div[data-baseweb="slider"] div[role="slider"] {
         background-color: var(--primary-blue) !important;
         border: 2px solid white !important;
-        box-shadow: 0 0 4px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 0 4px rgba(0,0,0,0.4) !important;
     }
 
     /* --- CHECKBOX --- */
@@ -171,8 +177,10 @@ def get_day_name(d):
 
 def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_same_consecutive):
     schedule = []
+    
     work_counts = {name: 0 for name in staff_db}
     weekend_counts = {name: 0 for name in staff_db}
+    
     targets = {}
     for name, info in staff_db.items():
         weeks = len(date_list) / 7
@@ -183,6 +191,7 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
     for current_day in date_list:
         day_name = get_day_name(current_day)
         is_weekend = current_day.weekday() >= 5
+        
         row = {"Data": current_day, "Giorno": day_name}
         current_day_assignments = {s: [] for s in shifts} 
         
@@ -193,37 +202,52 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
             continue
             
         worked_today = [] 
+        
         for shift in shifts:
             assigned_names = []
             shift_reqs = reqs.get(shift, {})
+            
             for role, count_needed in shift_reqs.items():
                 if count_needed <= 0: continue
+                
                 candidates = []
                 for name, info in staff_db.items():
+                    # 1. Ruolo e Disponibilità
                     if info['role'] != role: continue
                     if current_day in info['unavail']: continue
                     if shift not in info['shifts']: continue
+                    
+                    # 2. Target e Doppio Turno
                     if work_counts[name] >= targets[name]: continue
                     if name in worked_today: continue
+                    
+                    # 3. Logica Consecutiva
                     if avoid_same_consecutive and prev_day_assignments:
                         people_yesterday_same_shift = prev_day_assignments.get(shift, [])
-                        if name in people_yesterday_same_shift: continue 
+                        if name in people_yesterday_same_shift:
+                            continue 
+
                     candidates.append(name)
                 
+                # Ordinamento 
                 if is_weekend:
                     candidates.sort(key=lambda x: (weekend_counts[x], work_counts[x], random.random()))
                 else:
                     candidates.sort(key=lambda x: (work_counts[x], random.random()))
                 
+                # Selezione
                 for i in range(min(len(candidates), count_needed)):
                     chosen = candidates[i]
                     display_name = f"{chosen} ({role[:3].upper()})"
                     assigned_names.append(display_name)
+                    
                     worked_today.append(chosen)
                     current_day_assignments[shift].append(chosen)
+                    
                     work_counts[chosen] += 1
                     if is_weekend: weekend_counts[chosen] += 1
                 
+                # Gestione Scoperti
                 filled_role_count = len([x for x in assigned_names if role[:3].upper() in x])
                 missing = count_needed - filled_role_count
                 if missing > 0:
@@ -248,7 +272,8 @@ def pdf_export(df, shifts):
     cols = ['Data', 'Giorno'] + shifts
     col_w = 275 / len(cols)
     
-    pdf.set_fill_color(240, 248, 255) 
+    # Header Grigio Chiaro Professionale
+    pdf.set_fill_color(245, 245, 245) 
     pdf.set_font("Helvetica", 'B', 8)
     for c in cols:
         pdf.cell(col_w, 8, c.upper(), 1, 0, 'C', True)
