@@ -36,77 +36,117 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "CORPORATE BLUE" (AGGIORNATO) ---
+# --- 3. CSS "CORPORATE TOTAL BLUE" ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
     
+    :root {
+        --primary-color: #0f172a; /* Blu scuro professionale */
+        --hover-color: #1e293b;
+        --accent-color: #3b82f6; /* Blu più chiaro per dettagli */
+    }
+
     html, body, [class*="css"] {
-        font-family: 'Roboto', sans-serif;
-        color: #333333;
+        font-family: 'Inter', sans-serif;
+        color: #1f2937;
     }
     
-    /* Sidebar */
+    /* Sidebar Background */
     [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #dee2e6;
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
     }
     
-    /* Buttons - STILE BLU PROFESSIONALE */
+    /* --- BOTTONI --- */
     .stButton>button {
-        background-color: #0056b3; /* Blu Scuro */
+        background-color: var(--primary-color);
         color: white;
-        border-radius: 4px;
+        border-radius: 6px;
         border: none;
         padding: 0.5rem 1rem;
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.85rem;
-        letter-spacing: 0.5px;
-        transition: background-color 0.2s ease;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        transition: all 0.2s;
     }
     .stButton>button:hover {
-        background-color: #004494; /* Blu ancora più scuro per hover */
+        background-color: var(--hover-color);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     
-    /* Tabs */
+    /* --- TABS (La riga sotto le tab) --- */
     .stTabs [data-baseweb="tab-list"] {
         gap: 24px;
+        border-bottom: 1px solid #e2e8f0;
     }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
-        white-space: pre-wrap;
         background-color: transparent;
-        border-radius: 4px 4px 0px 0px;
-        gap: 1px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        color: #6c757d;
-        font-weight: 400;
+        border: none;
+        color: #64748b;
+        font-weight: 500;
     }
     .stTabs [aria-selected="true"] {
-        background-color: transparent;
-        border-bottom: 2px solid #0056b3; /* Sottolineatura Blu */
-        color: #0056b3;
-        font-weight: 600;
-    }
-    
-    /* Tables */
-    [data-testid="stDataFrame"] {
-        border: 1px solid #dee2e6;
-    }
-    
-    /* Headers */
-    h1, h2, h3 {
-        color: #212529 !important;
+        color: var(--primary-color) !important;
+        border-bottom: 3px solid var(--primary-color) !important; /* Riga Blu Scuro */
         font-weight: 700;
     }
     
-    /* Alerts */
+    /* --- MULTISELECT & TAGS (I giorni della settimana) --- */
+    /* Sfondo del tag selezionato */
+    span[data-baseweb="tag"] {
+        background-color: #e0f2fe !important; /* Blu chiarissimo */
+        border: 1px solid #bae6fd;
+    }
+    /* Testo del tag */
+    span[data-baseweb="tag"] span {
+        color: #0c4a6e !important; /* Blu scuro testo */
+    }
+    /* Icona X per chiudere il tag */
+    span[data-baseweb="tag"] svg {
+        fill: #0c4a6e !important;
+    }
+
+    /* --- SLIDER --- */
+    div[data-baseweb="slider"] div[role="slider"] {
+        background-color: var(--primary-color) !important; /* Pallino blu */
+    }
+    div[data-baseweb="slider"] div {
+        background-color: #cbd5e1; /* Barra grigia */
+    }
+    div[data-baseweb="slider"] div[style*="width"] {
+        background-color: var(--primary-color) !important; /* Barra piena blu */
+    }
+
+    /* --- CHECKBOX --- */
+    /* Quando selezionata */
+    [data-baseweb="checkbox"] div[class*="checked"] {
+        background-color: var(--primary-color) !important;
+        border-color: var(--primary-color) !important;
+    }
+
+    /* --- INPUT FIELDS FOCUS (Bordi blu invece di arancioni) --- */
+    input:focus, textarea:focus, select:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 1px var(--primary-color) !important;
+    }
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 1px var(--primary-color) !important;
+    }
+
+    /* --- HEADERS --- */
+    h1, h2, h3 {
+        color: #111827 !important;
+        font-weight: 700;
+    }
+    
+    /* --- ALERTS --- */
     .stAlert {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        color: #333;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -131,7 +171,6 @@ def get_day_name(d):
 
 def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_same_consecutive):
     schedule = []
-    
     work_counts = {name: 0 for name in staff_db}
     weekend_counts = {name: 0 for name in staff_db}
     
@@ -166,16 +205,12 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
                 
                 candidates = []
                 for name, info in staff_db.items():
-                    # 1. Ruolo e Disponibilità
                     if info['role'] != role: continue
                     if current_day in info['unavail']: continue
                     if shift not in info['shifts']: continue
-                    
-                    # 2. Target e Doppio Turno
                     if work_counts[name] >= targets[name]: continue
                     if name in worked_today: continue
                     
-                    # 3. Logica Consecutiva
                     if avoid_same_consecutive and prev_day_assignments:
                         people_yesterday_same_shift = prev_day_assignments.get(shift, [])
                         if name in people_yesterday_same_shift:
@@ -183,25 +218,20 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
 
                     candidates.append(name)
                 
-                # Ordinamento 
                 if is_weekend:
                     candidates.sort(key=lambda x: (weekend_counts[x], work_counts[x], random.random()))
                 else:
                     candidates.sort(key=lambda x: (work_counts[x], random.random()))
                 
-                # Selezione
                 for i in range(min(len(candidates), count_needed)):
                     chosen = candidates[i]
                     display_name = f"{chosen} ({role[:3].upper()})"
                     assigned_names.append(display_name)
-                    
                     worked_today.append(chosen)
                     current_day_assignments[shift].append(chosen)
-                    
                     work_counts[chosen] += 1
                     if is_weekend: weekend_counts[chosen] += 1
                 
-                # Gestione Scoperti
                 filled_role_count = len([x for x in assigned_names if role[:3].upper() in x])
                 missing = count_needed - filled_role_count
                 if missing > 0:
@@ -226,7 +256,7 @@ def pdf_export(df, shifts):
     cols = ['Data', 'Giorno'] + shifts
     col_w = 275 / len(cols)
     
-    pdf.set_fill_color(230, 230, 230)
+    pdf.set_fill_color(240, 248, 255) # Blu chiarissimo per header PDF
     pdf.set_font("Helvetica", 'B', 8)
     for c in cols:
         pdf.cell(col_w, 8, c.upper(), 1, 0, 'C', True)
@@ -241,11 +271,11 @@ def pdf_export(df, shifts):
         for s in shifts:
             txt = str(row[s])
             if "SCOPERTO" in txt:
-                pdf.set_text_color(200, 0, 0); pdf.set_font("Helvetica", 'B', 7)
+                pdf.set_text_color(185, 28, 28); pdf.set_font("Helvetica", 'B', 7) # Rosso scuro
             elif "CHIUSO" in txt:
-                pdf.set_text_color(150, 150, 150); pdf.set_font("Helvetica", 'I', 7)
+                pdf.set_text_color(148, 163, 184); pdf.set_font("Helvetica", 'I', 7) # Grigio
             else:
-                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", '', 7)
+                pdf.set_text_color(15, 23, 42); pdf.set_font("Helvetica", '', 7) # Blu scuro
             
             if len(txt) > 30: txt = txt[:27] + "..."
             pdf.cell(col_w, 8, txt, 1, 0, 'C')
@@ -260,7 +290,7 @@ with st.sidebar:
     st.caption(f"Licenza: {'Attiva' if trial_active else 'Scaduta'} | {days_left}gg rimanenti")
     st.markdown("---")
     
-    st.subheader("Configurazione Generale")
+    st.subheader("Generale")
     start_dt = st.date_input("Data Inizio", date.today())
     days_num = st.number_input("Giorni da pianificare", 7, 365, 30)
     
@@ -356,7 +386,6 @@ with tab_gen:
             column_config={"Data": st.column_config.DateColumn(format="DD/MM/YYYY")}
         )
         
-        # Statistiche Rapide
         flat_list = []
         for s in shifts: flat_list.extend(edited_df[s].tolist())
         scoperti = sum([str(x).count("SCOPERTO") for x in flat_list])
@@ -366,7 +395,6 @@ with tab_gen:
         else:
             st.error(f"Attenzione: {scoperti} posizioni risultano scoperte.")
 
-        # Export
         try:
             pdf_data = pdf_export(edited_df, shifts)
             st.download_button("SCARICA PDF", pdf_data, "turni.pdf", "application/pdf")
@@ -379,29 +407,20 @@ with tab_comm:
     st.info("Genera un messaggio formattato pronto per essere inviato sul gruppo aziendale.")
     
     if st.session_state.schedule_df is not None:
-        # Generazione testo formattato per WA
         wa_text = f"*TURNI SETTIMANALI - DAL {start_dt.strftime('%d/%m')}*\n\n"
         df = st.session_state.schedule_df
         for index, row in df.iterrows():
             if row['Giorno'] not in active_days: continue
-            
-            # Formattazione data carina
             date_str = row['Data'].strftime('%d/%m') if hasattr(row['Data'], 'strftime') else str(row['Data'])
             wa_text += f"📅 *{row['Giorno']} {date_str}*\n"
-            
             for s in shifts:
-                # Pulizia del testo per renderlo leggibile su chat
                 staff_str = str(row[s])
                 if staff_str == "-" or staff_str == "CHIUSO":
                     continue
-                
-                # Formattazione lista puntata per i nomi
                 staff_list = staff_str.split(", ")
                 formatted_staff = "\n".join([f"   ▫ {p}" for p in staff_list])
-                
                 wa_text += f"   *{s.upper()}*:\n{formatted_staff}\n"
             wa_text += "-------------------\n"
-        
         st.text_area("Copia questo testo:", wa_text, height=400)
     else:
         st.warning("Genera prima i turni per vedere l'anteprima del messaggio.")
