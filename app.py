@@ -36,7 +36,7 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "TOTAL BLUE OVERRIDE" (CORREZIONE COLORI) ---
+# --- 3. CSS "TOTAL BLUE - SLIDER FIX" ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
@@ -45,48 +45,52 @@ st.markdown("""
         --primary-blue: #0056b3;
         --dark-blue: #004494;
         --light-blue-bg: #eff6ff;
-        --gray-text: #1f2937;
+        --text-color: #0f172a;
     }
 
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
-        color: var(--gray-text) !important;
+        color: var(--text-color) !important;
         background-color: #ffffff;
     }
     
-    /* --- SIDEBAR --- */
+    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #f8fafc;
         border-right: 1px solid #e2e8f0;
     }
 
-    /* --- CHECKBOX (LA SPUNTA ROSSA -> BLU) --- */
-    /* Quando è selezionata (checked) */
+    /* --- SLIDER FIX (IL PROBLEMA ERA QUI) --- */
+    
+    /* 1. Il numero sopra lo slider (Valore) */
+    div[data-testid="stSlider"] div[data-baseweb="slider"] div {
+        color: var(--primary-blue) !important; 
+        font-weight: 800 !important; /* Molto grassetto */
+        font-size: 1.1rem !important; /* Più grande */
+    }
+    
+    /* 2. La barra piena (Track) - Forza il blu sopra il rosso di default */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {
+        background-color: var(--primary-blue) !important;
+    }
+    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"] {
+        background-color: var(--primary-blue) !important;
+    }
+    
+    /* 3. Il pallino (Thumb) */
+    div[data-baseweb="slider"] div[role="slider"] {
+        background-color: var(--primary-blue) !important;
+        border: 2px solid white !important;
+        box-shadow: 0 0 4px rgba(0,0,0,0.3) !important;
+    }
+
+    /* --- CHECKBOX --- */
     div[data-baseweb="checkbox"] div[aria-checked="true"] {
         background-color: var(--primary-blue) !important;
         border-color: var(--primary-blue) !important;
     }
-    /* Il quadratino interno */
-    div[data-baseweb="checkbox"] div[aria-checked="true"] div {
-        background-color: var(--primary-blue) !important;
-    }
 
-    /* --- SLIDER (LA BARRA ROSSA -> BLU) --- */
-    /* Il pallino (Thumb) */
-    div[data-baseweb="slider"] div[role="slider"] {
-        background-color: var(--primary-blue) !important;
-        box-shadow: 0 0 0 1px var(--primary-blue) !important;
-    }
-    /* La barra piena (Track filled) - Questa è quella che era rossa */
-    div[data-baseweb="slider"] div > div:first-child { 
-        background-color: var(--primary-blue) !important; 
-    }
-    /* Forza bruta per eventuali sottolivelli dello slider che rimangono rossi */
-    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {
-        background-color: var(--primary-blue) !important;
-    }
-
-    /* --- TAGS (MULTISELECT) --- */
+    /* --- TAGS (Giorni della settimana) --- */
     span[data-baseweb="tag"] {
         background-color: var(--light-blue-bg) !important;
         border: 1px solid #bfdbfe !important;
@@ -98,13 +102,11 @@ st.markdown("""
         fill: var(--primary-blue) !important;
     }
 
-    /* --- INPUT FIELDS (FOCUS) --- */
-    /* Rimuove bordo rosso/arancione quando clicchi */
+    /* --- INPUT FIELDS --- */
     input:focus, textarea:focus, select:focus {
         border-color: var(--primary-blue) !important;
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
-    /* Dropdown focus */
     div[data-baseweb="select"] > div:focus-within {
         border-color: var(--primary-blue) !important;
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
@@ -134,7 +136,6 @@ st.markdown("""
     .stButton>button:hover {
         background-color: var(--dark-blue);
         color: white;
-        border: none;
     }
 
     /* --- HEADERS --- */
@@ -145,7 +146,7 @@ st.markdown("""
     
     /* --- ALERTS --- */
     .stAlert {
-        background-color: #f0fdf4; /* Verde chiarissimo o neutro */
+        background-color: #f0fdf4; 
         border: 1px solid #dcfce7;
     }
     </style>
@@ -170,10 +171,8 @@ def get_day_name(d):
 
 def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_same_consecutive):
     schedule = []
-    
     work_counts = {name: 0 for name in staff_db}
     weekend_counts = {name: 0 for name in staff_db}
-    
     targets = {}
     for name, info in staff_db.items():
         weeks = len(date_list) / 7
@@ -184,7 +183,6 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
     for current_day in date_list:
         day_name = get_day_name(current_day)
         is_weekend = current_day.weekday() >= 5
-        
         row = {"Data": current_day, "Giorno": day_name}
         current_day_assignments = {s: [] for s in shifts} 
         
@@ -195,14 +193,11 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
             continue
             
         worked_today = [] 
-        
         for shift in shifts:
             assigned_names = []
             shift_reqs = reqs.get(shift, {})
-            
             for role, count_needed in shift_reqs.items():
                 if count_needed <= 0: continue
-                
                 candidates = []
                 for name, info in staff_db.items():
                     if info['role'] != role: continue
@@ -210,12 +205,9 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
                     if shift not in info['shifts']: continue
                     if work_counts[name] >= targets[name]: continue
                     if name in worked_today: continue
-                    
                     if avoid_same_consecutive and prev_day_assignments:
                         people_yesterday_same_shift = prev_day_assignments.get(shift, [])
-                        if name in people_yesterday_same_shift:
-                            continue 
-
+                        if name in people_yesterday_same_shift: continue 
                     candidates.append(name)
                 
                 if is_weekend:
@@ -256,8 +248,7 @@ def pdf_export(df, shifts):
     cols = ['Data', 'Giorno'] + shifts
     col_w = 275 / len(cols)
     
-    # Header Grigio Chiaro Professionale
-    pdf.set_fill_color(245, 245, 245) 
+    pdf.set_fill_color(240, 248, 255) 
     pdf.set_font("Helvetica", 'B', 8)
     for c in cols:
         pdf.cell(col_w, 8, c.upper(), 1, 0, 'C', True)
@@ -272,11 +263,11 @@ def pdf_export(df, shifts):
         for s in shifts:
             txt = str(row[s])
             if "SCOPERTO" in txt:
-                pdf.set_text_color(185, 28, 28); pdf.set_font("Helvetica", 'B', 7) # Rosso scuro
+                pdf.set_text_color(185, 28, 28); pdf.set_font("Helvetica", 'B', 7) 
             elif "CHIUSO" in txt:
-                pdf.set_text_color(148, 163, 184); pdf.set_font("Helvetica", 'I', 7) # Grigio
+                pdf.set_text_color(148, 163, 184); pdf.set_font("Helvetica", 'I', 7) 
             else:
-                pdf.set_text_color(15, 23, 42); pdf.set_font("Helvetica", '', 7) # Blu scuro
+                pdf.set_text_color(15, 23, 42); pdf.set_font("Helvetica", '', 7) 
             
             if len(txt) > 30: txt = txt[:27] + "..."
             pdf.cell(col_w, 8, txt, 1, 0, 'C')
@@ -301,7 +292,7 @@ with st.sidebar:
     shifts_in = st.text_input("Turni (separati da virgola)", "Pranzo, Cena")
     shifts = [s.strip() for s in shifts_in.split(',') if s.strip()]
 
-    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True, help="Se attivo, chi fa 'Pranzo' oggi non farà 'Pranzo' domani.")
+    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True)
     
     st.markdown("---")
     st.subheader("Ruoli & Staff")
@@ -402,7 +393,7 @@ with tab_gen:
         except Exception as e:
             st.error(f"Errore PDF: {e}")
 
-# TAB 4: COMUNICAZIONI (SOLO WHATSAPP)
+# TAB 4: COMUNICAZIONI
 with tab_comm:
     st.subheader("Esportazione per Chat")
     st.info("Genera un messaggio formattato pronto per essere inviato sul gruppo aziendale.")
