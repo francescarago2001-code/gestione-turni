@@ -36,117 +36,117 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "CORPORATE TOTAL BLUE" ---
+# --- 3. CSS "TOTAL WHITE & BLUE PRO" ---
 st.markdown("""
     <style>
+    /* Import Font Pulito */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
     
     :root {
-        --primary-color: #0f172a; /* Blu scuro professionale */
-        --hover-color: #1e293b;
-        --accent-color: #3b82f6; /* Blu più chiaro per dettagli */
+        --primary-blue: #0056b3;
+        --light-blue: #e7f1ff;
+        --border-blue: #004494;
+        --text-black: #000000;
     }
 
+    /* Reset Globale */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
-        color: #1f2937;
+        color: var(--text-black) !important;
+        background-color: #ffffff;
     }
     
-    /* Sidebar Background */
+    /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #f8fafc;
-        border-right: 1px solid #e2e8f0;
+        background-color: #f8f9fa; /* Grigio chiarissimo per stacco */
+        border-right: 1px solid #e0e0e0;
     }
     
-    /* --- BOTTONI --- */
-    .stButton>button {
-        background-color: var(--primary-color);
-        color: white;
-        border-radius: 6px;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 0.8rem;
-        letter-spacing: 0.05em;
-        transition: all 0.2s;
+    /* --- INPUT FIELDS (Il contorno quando clicchi) --- */
+    /* Rimuove l'arancione di default di Streamlit */
+    input:focus, textarea:focus, select:focus {
+        border-color: var(--primary-blue) !important;
+        box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
-    .stButton>button:hover {
-        background-color: var(--hover-color);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    /* Contorno dei dropdown */
+    div[data-baseweb="select"] > div {
+        border-color: #cccccc;
     }
-    
-    /* --- TABS (La riga sotto le tab) --- */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
-        border-bottom: 1px solid #e2e8f0;
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: var(--primary-blue) !important;
+        box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        background-color: transparent;
-        border: none;
-        color: #64748b;
-        font-weight: 500;
-    }
-    .stTabs [aria-selected="true"] {
-        color: var(--primary-color) !important;
-        border-bottom: 3px solid var(--primary-color) !important; /* Riga Blu Scuro */
-        font-weight: 700;
-    }
-    
-    /* --- MULTISELECT & TAGS (I giorni della settimana) --- */
-    /* Sfondo del tag selezionato */
+
+    /* --- I TAG DEI GIORNI (Multiselect) --- */
+    /* Il contenitore del tag */
     span[data-baseweb="tag"] {
-        background-color: #e0f2fe !important; /* Blu chiarissimo */
-        border: 1px solid #bae6fd;
+        background-color: var(--light-blue) !important; /* Sfondo Blu Chiaro */
+        border: 1px solid var(--primary-blue) !important; /* Bordo Blu Scuro */
     }
-    /* Testo del tag */
+    /* Il testo dentro il tag */
     span[data-baseweb="tag"] span {
-        color: #0c4a6e !important; /* Blu scuro testo */
+        color: var(--primary-blue) !important; /* Testo Blu */
     }
-    /* Icona X per chiudere il tag */
+    /* La X per chiudere il tag */
     span[data-baseweb="tag"] svg {
-        fill: #0c4a6e !important;
+        fill: var(--primary-blue) !important;
     }
 
     /* --- SLIDER --- */
+    /* Il pallino */
     div[data-baseweb="slider"] div[role="slider"] {
-        background-color: var(--primary-color) !important; /* Pallino blu */
+        background-color: var(--primary-blue) !important;
+        box-shadow: none !important;
     }
-    div[data-baseweb="slider"] div {
-        background-color: #cbd5e1; /* Barra grigia */
-    }
+    /* La barra piena */
     div[data-baseweb="slider"] div[style*="width"] {
-        background-color: var(--primary-color) !important; /* Barra piena blu */
+        background-color: var(--primary-blue) !important;
     }
 
     /* --- CHECKBOX --- */
-    /* Quando selezionata */
-    [data-baseweb="checkbox"] div[class*="checked"] {
-        background-color: var(--primary-color) !important;
-        border-color: var(--primary-color) !important;
+    div[data-baseweb="checkbox"] div[class*="checked"] {
+        background-color: var(--primary-blue) !important;
+        border-color: var(--primary-blue) !important;
     }
 
-    /* --- INPUT FIELDS FOCUS (Bordi blu invece di arancioni) --- */
-    input:focus, textarea:focus, select:focus {
-        border-color: var(--primary-color) !important;
-        box-shadow: 0 0 0 1px var(--primary-color) !important;
+    /* --- TABS --- */
+    .stTabs [data-baseweb="tab-list"] {
+        border-bottom: 1px solid #ddd;
     }
-    div[data-baseweb="select"] > div:focus-within {
-        border-color: var(--primary-color) !important;
-        box-shadow: 0 0 0 1px var(--primary-color) !important;
+    .stTabs [aria-selected="true"] {
+        color: var(--primary-blue) !important;
+        border-bottom: 3px solid var(--primary-blue) !important;
     }
 
-    /* --- HEADERS --- */
-    h1, h2, h3 {
-        color: #111827 !important;
+    /* --- BOTTONI --- */
+    .stButton>button {
+        background-color: var(--primary-blue);
+        color: white;
+        border-radius: 4px;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: var(--border-blue); /* Blu più scuro */
+    }
+
+    /* --- TITOLI E TESTI --- */
+    h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
         font-weight: 700;
     }
+    label {
+        color: #000000 !important;
+        font-weight: 500;
+    }
     
-    /* --- ALERTS --- */
-    .stAlert {
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
+    /* --- TABELLE --- */
+    [data-testid="stDataFrame"] {
+        border: 1px solid #e0e0e0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -154,7 +154,6 @@ st.markdown("""
 # --- 4. BLOCCO PAYWALL ---
 if not trial_active:
     st.error(f"Licenza Scaduta. Il periodo di prova di {TRIAL_DAYS} giorni è terminato.")
-    st.info("Per continuare a utilizzare il software è necessario sottoscrivere un piano.")
     st.link_button("Rinnova Licenza", "https://www.paypal.com")
     st.stop()
 
@@ -171,6 +170,7 @@ def get_day_name(d):
 
 def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_same_consecutive):
     schedule = []
+    
     work_counts = {name: 0 for name in staff_db}
     weekend_counts = {name: 0 for name in staff_db}
     
@@ -256,7 +256,8 @@ def pdf_export(df, shifts):
     cols = ['Data', 'Giorno'] + shifts
     col_w = 275 / len(cols)
     
-    pdf.set_fill_color(240, 248, 255) # Blu chiarissimo per header PDF
+    # Header Grigio Chiaro Professionale
+    pdf.set_fill_color(245, 245, 245) 
     pdf.set_font("Helvetica", 'B', 8)
     for c in cols:
         pdf.cell(col_w, 8, c.upper(), 1, 0, 'C', True)
@@ -271,11 +272,11 @@ def pdf_export(df, shifts):
         for s in shifts:
             txt = str(row[s])
             if "SCOPERTO" in txt:
-                pdf.set_text_color(185, 28, 28); pdf.set_font("Helvetica", 'B', 7) # Rosso scuro
+                pdf.set_text_color(200, 0, 0); pdf.set_font("Helvetica", 'B', 7)
             elif "CHIUSO" in txt:
-                pdf.set_text_color(148, 163, 184); pdf.set_font("Helvetica", 'I', 7) # Grigio
+                pdf.set_text_color(150, 150, 150); pdf.set_font("Helvetica", 'I', 7)
             else:
-                pdf.set_text_color(15, 23, 42); pdf.set_font("Helvetica", '', 7) # Blu scuro
+                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", '', 7)
             
             if len(txt) > 30: txt = txt[:27] + "..."
             pdf.cell(col_w, 8, txt, 1, 0, 'C')
@@ -300,7 +301,7 @@ with st.sidebar:
     shifts_in = st.text_input("Turni (separati da virgola)", "Pranzo, Cena")
     shifts = [s.strip() for s in shifts_in.split(',') if s.strip()]
 
-    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True, help="Se attivo, chi fa 'Pranzo' oggi non farà 'Pranzo' domani.")
+    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True)
     
     st.markdown("---")
     st.subheader("Ruoli & Staff")
@@ -401,7 +402,7 @@ with tab_gen:
         except Exception as e:
             st.error(f"Errore PDF: {e}")
 
-# TAB 4: COMUNICAZIONI (SOLO WHATSAPP)
+# TAB 4: COMUNICAZIONI
 with tab_comm:
     st.subheader("Esportazione per Chat")
     st.info("Genera un messaggio formattato pronto per essere inviato sul gruppo aziendale.")
