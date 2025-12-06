@@ -36,117 +36,117 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "TOTAL WHITE & BLUE PRO" ---
+# --- 3. CSS "TOTAL BLUE OVERRIDE" (CORREZIONE COLORI) ---
 st.markdown("""
     <style>
-    /* Import Font Pulito */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
     
     :root {
         --primary-blue: #0056b3;
-        --light-blue: #e7f1ff;
-        --border-blue: #004494;
-        --text-black: #000000;
+        --dark-blue: #004494;
+        --light-blue-bg: #eff6ff;
+        --gray-text: #1f2937;
     }
 
-    /* Reset Globale */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
-        color: var(--text-black) !important;
+        color: var(--gray-text) !important;
         background-color: #ffffff;
     }
     
-    /* Sidebar */
+    /* --- SIDEBAR --- */
     [data-testid="stSidebar"] {
-        background-color: #f8f9fa; /* Grigio chiarissimo per stacco */
-        border-right: 1px solid #e0e0e0;
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
     }
-    
-    /* --- INPUT FIELDS (Il contorno quando clicchi) --- */
-    /* Rimuove l'arancione di default di Streamlit */
+
+    /* --- CHECKBOX (LA SPUNTA ROSSA -> BLU) --- */
+    /* Quando è selezionata (checked) */
+    div[data-baseweb="checkbox"] div[aria-checked="true"] {
+        background-color: var(--primary-blue) !important;
+        border-color: var(--primary-blue) !important;
+    }
+    /* Il quadratino interno */
+    div[data-baseweb="checkbox"] div[aria-checked="true"] div {
+        background-color: var(--primary-blue) !important;
+    }
+
+    /* --- SLIDER (LA BARRA ROSSA -> BLU) --- */
+    /* Il pallino (Thumb) */
+    div[data-baseweb="slider"] div[role="slider"] {
+        background-color: var(--primary-blue) !important;
+        box-shadow: 0 0 0 1px var(--primary-blue) !important;
+    }
+    /* La barra piena (Track filled) - Questa è quella che era rossa */
+    div[data-baseweb="slider"] div > div:first-child { 
+        background-color: var(--primary-blue) !important; 
+    }
+    /* Forza bruta per eventuali sottolivelli dello slider che rimangono rossi */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {
+        background-color: var(--primary-blue) !important;
+    }
+
+    /* --- TAGS (MULTISELECT) --- */
+    span[data-baseweb="tag"] {
+        background-color: var(--light-blue-bg) !important;
+        border: 1px solid #bfdbfe !important;
+    }
+    span[data-baseweb="tag"] span {
+        color: var(--primary-blue) !important;
+    }
+    span[data-baseweb="tag"] svg {
+        fill: var(--primary-blue) !important;
+    }
+
+    /* --- INPUT FIELDS (FOCUS) --- */
+    /* Rimuove bordo rosso/arancione quando clicchi */
     input:focus, textarea:focus, select:focus {
         border-color: var(--primary-blue) !important;
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
-    /* Contorno dei dropdown */
-    div[data-baseweb="select"] > div {
-        border-color: #cccccc;
-    }
+    /* Dropdown focus */
     div[data-baseweb="select"] > div:focus-within {
         border-color: var(--primary-blue) !important;
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
 
-    /* --- I TAG DEI GIORNI (Multiselect) --- */
-    /* Il contenitore del tag */
-    span[data-baseweb="tag"] {
-        background-color: var(--light-blue) !important; /* Sfondo Blu Chiaro */
-        border: 1px solid var(--primary-blue) !important; /* Bordo Blu Scuro */
-    }
-    /* Il testo dentro il tag */
-    span[data-baseweb="tag"] span {
-        color: var(--primary-blue) !important; /* Testo Blu */
-    }
-    /* La X per chiudere il tag */
-    span[data-baseweb="tag"] svg {
-        fill: var(--primary-blue) !important;
-    }
-
-    /* --- SLIDER --- */
-    /* Il pallino */
-    div[data-baseweb="slider"] div[role="slider"] {
-        background-color: var(--primary-blue) !important;
-        box-shadow: none !important;
-    }
-    /* La barra piena */
-    div[data-baseweb="slider"] div[style*="width"] {
-        background-color: var(--primary-blue) !important;
-    }
-
-    /* --- CHECKBOX --- */
-    div[data-baseweb="checkbox"] div[class*="checked"] {
-        background-color: var(--primary-blue) !important;
-        border-color: var(--primary-blue) !important;
-    }
-
     /* --- TABS --- */
     .stTabs [data-baseweb="tab-list"] {
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid #e2e8f0;
     }
     .stTabs [aria-selected="true"] {
         color: var(--primary-blue) !important;
-        border-bottom: 3px solid var(--primary-blue) !important;
+        border-bottom-color: var(--primary-blue) !important;
     }
 
     /* --- BOTTONI --- */
     .stButton>button {
         background-color: var(--primary-blue);
         color: white;
-        border-radius: 4px;
         border: none;
-        padding: 0.6rem 1.2rem;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
         font-weight: 600;
         text-transform: uppercase;
         font-size: 0.85rem;
-        transition: 0.2s;
+        transition: background 0.2s;
     }
     .stButton>button:hover {
-        background-color: var(--border-blue); /* Blu più scuro */
+        background-color: var(--dark-blue);
+        color: white;
+        border: none;
     }
 
-    /* --- TITOLI E TESTI --- */
-    h1, h2, h3, h4, h5, h6 {
-        color: #000000 !important;
+    /* --- HEADERS --- */
+    h1, h2, h3, h4 {
+        color: #111827 !important;
         font-weight: 700;
     }
-    label {
-        color: #000000 !important;
-        font-weight: 500;
-    }
     
-    /* --- TABELLE --- */
-    [data-testid="stDataFrame"] {
-        border: 1px solid #e0e0e0;
+    /* --- ALERTS --- */
+    .stAlert {
+        background-color: #f0fdf4; /* Verde chiarissimo o neutro */
+        border: 1px solid #dcfce7;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -272,11 +272,11 @@ def pdf_export(df, shifts):
         for s in shifts:
             txt = str(row[s])
             if "SCOPERTO" in txt:
-                pdf.set_text_color(200, 0, 0); pdf.set_font("Helvetica", 'B', 7)
+                pdf.set_text_color(185, 28, 28); pdf.set_font("Helvetica", 'B', 7) # Rosso scuro
             elif "CHIUSO" in txt:
-                pdf.set_text_color(150, 150, 150); pdf.set_font("Helvetica", 'I', 7)
+                pdf.set_text_color(148, 163, 184); pdf.set_font("Helvetica", 'I', 7) # Grigio
             else:
-                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", '', 7)
+                pdf.set_text_color(15, 23, 42); pdf.set_font("Helvetica", '', 7) # Blu scuro
             
             if len(txt) > 30: txt = txt[:27] + "..."
             pdf.cell(col_w, 8, txt, 1, 0, 'C')
@@ -301,7 +301,7 @@ with st.sidebar:
     shifts_in = st.text_input("Turni (separati da virgola)", "Pranzo, Cena")
     shifts = [s.strip() for s in shifts_in.split(',') if s.strip()]
 
-    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True)
+    avoid_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True, help="Se attivo, chi fa 'Pranzo' oggi non farà 'Pranzo' domani.")
     
     st.markdown("---")
     st.subheader("Ruoli & Staff")
@@ -402,7 +402,7 @@ with tab_gen:
         except Exception as e:
             st.error(f"Errore PDF: {e}")
 
-# TAB 4: COMUNICAZIONI
+# TAB 4: COMUNICAZIONI (SOLO WHATSAPP)
 with tab_comm:
     st.subheader("Esportazione per Chat")
     st.info("Genera un messaggio formattato pronto per essere inviato sul gruppo aziendale.")
