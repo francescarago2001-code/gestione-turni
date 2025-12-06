@@ -36,7 +36,7 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "NUCLEAR BLUE" (Sovrascrittura Totale) ---
+# --- 3. CSS "TOTAL BLUE - SLIDER NUCLEAR FIX" ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
@@ -60,35 +60,42 @@ st.markdown("""
         border-right: 1px solid #e2e8f0;
     }
 
-    /* ==============================================
-       FIX AGGRESSIVO PER COLORI ARANCIONI/ROSSI
-       ============================================== */
-
-    /* 1. SLIDER: La barra di riempimento */
-    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"], 
-    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"] {
+    /* --- SLIDER FIX (MODALITÀ AGGRESSIVA) --- */
+    /* 1. Il numero (Valore) sopra lo slider */
+    div[data-testid="stSlider"] label + div {
+        color: var(--primary-blue) !important;
+    }
+    div[data-testid="stSlider"] div[data-baseweb="slider"] div {
+        color: var(--primary-blue) !important; 
+        font-weight: 700 !important;
+    }
+    
+    /* 2. La barra piena (Track filled) - Cerca il rosso e lo elimina */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"],
+    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"],
+    div[data-baseweb="slider"] div[style*="background-color: #F63366"] {
         background-color: var(--primary-blue) !important;
     }
-
-    /* 2. SLIDER: Il numero sopra */
-    div[data-testid="stSlider"] div[data-baseweb="slider"] div {
-        color: var(--primary-blue) !important;
-        font-weight: bold !important;
+    
+    /* 3. Fallback generico per la barra piena */
+    div[data-baseweb="slider"] > div > div > div > div:first-child {
+        background-color: var(--primary-blue) !important;
     }
-
-    /* 3. SLIDER: Il pallino */
+    
+    /* 4. Il pallino (Thumb) */
     div[data-baseweb="slider"] div[role="slider"] {
         background-color: var(--primary-blue) !important;
-        box-shadow: 0 0 5px rgba(0, 86, 179, 0.5) !important;
+        border: 2px solid white !important;
+        box-shadow: 0 0 4px rgba(0,0,0,0.4) !important;
     }
 
-    /* 4. CHECKBOX: Il quadratino quando selezionato */
+    /* --- CHECKBOX --- */
     div[data-baseweb="checkbox"] div[aria-checked="true"] {
         background-color: var(--primary-blue) !important;
         border-color: var(--primary-blue) !important;
     }
-    
-    /* 5. MULTISELECT & TAGS: Colore di sfondo e testo */
+
+    /* --- TAGS (Giorni della settimana) --- */
     span[data-baseweb="tag"] {
         background-color: var(--light-blue-bg) !important;
         border: 1px solid #bfdbfe !important;
@@ -100,7 +107,7 @@ st.markdown("""
         fill: var(--primary-blue) !important;
     }
 
-    /* 6. INPUT FOCUS: Bordi blu quando scrivi */
+    /* --- INPUT FIELDS --- */
     input:focus, textarea:focus, select:focus {
         border-color: var(--primary-blue) !important;
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
@@ -110,16 +117,16 @@ st.markdown("""
         box-shadow: 0 0 0 1px var(--primary-blue) !important;
     }
 
-    /* --- ALTRI STILI --- */
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] { border-bottom: 1px solid #e2e8f0; }
+    /* --- TABS --- */
+    .stTabs [data-baseweb="tab-list"] {
+        border-bottom: 1px solid #e2e8f0;
+    }
     .stTabs [aria-selected="true"] {
         color: var(--primary-blue) !important;
         border-bottom-color: var(--primary-blue) !important;
     }
 
-    /* Bottoni */
+    /* --- BOTTONI --- */
     .stButton>button {
         background-color: var(--primary-blue);
         color: white;
@@ -136,11 +143,17 @@ st.markdown("""
         color: white;
     }
 
-    /* Headers */
-    h1, h2, h3, h4 { color: #111827 !important; font-weight: 700; }
+    /* --- HEADERS --- */
+    h1, h2, h3, h4 {
+        color: #111827 !important;
+        font-weight: 700;
+    }
     
-    /* Alerts */
-    .stAlert { background-color: #f0fdf4; border: 1px solid #dcfce7; }
+    /* --- ALERTS --- */
+    .stAlert {
+        background-color: #f0fdf4; 
+        border: 1px solid #dcfce7;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -163,8 +176,10 @@ def get_day_name(d):
 
 def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_same_consecutive):
     schedule = []
+    
     work_counts = {name: 0 for name in staff_db}
     weekend_counts = {name: 0 for name in staff_db}
+    
     targets = {}
     for name, info in staff_db.items():
         weeks = len(date_list) / 7
@@ -175,6 +190,7 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
     for current_day in date_list:
         day_name = get_day_name(current_day)
         is_weekend = current_day.weekday() >= 5
+        
         row = {"Data": current_day, "Giorno": day_name}
         current_day_assignments = {s: [] for s in shifts} 
         
@@ -185,11 +201,14 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
             continue
             
         worked_today = [] 
+        
         for shift in shifts:
             assigned_names = []
             shift_reqs = reqs.get(shift, {})
+            
             for role, count_needed in shift_reqs.items():
                 if count_needed <= 0: continue
+                
                 candidates = []
                 for name, info in staff_db.items():
                     if info['role'] != role: continue
@@ -197,9 +216,12 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
                     if shift not in info['shifts']: continue
                     if work_counts[name] >= targets[name]: continue
                     if name in worked_today: continue
+                    
                     if avoid_same_consecutive and prev_day_assignments:
                         people_yesterday_same_shift = prev_day_assignments.get(shift, [])
-                        if name in people_yesterday_same_shift: continue 
+                        if name in people_yesterday_same_shift:
+                            continue 
+
                     candidates.append(name)
                 
                 if is_weekend:
@@ -320,4 +342,93 @@ with tab_req:
     cols = st.columns(len(shifts))
     for i, shift in enumerate(shifts):
         with cols[i]:
-            st.markdown(f"
+            st.markdown(f"**{shift}**")
+            shift_reqs = {}
+            for role in roles:
+                count = st.number_input(f"{role}", min_value=0, value=1, key=f"req_{shift}_{role}")
+                shift_reqs[role] = count
+            requirements[shift] = shift_reqs
+
+# TAB 2: STAFF
+with tab_staff:
+    st.subheader("Dettagli Dipendenti")
+    staff_db = {}
+    
+    for name in staff_names:
+        with st.expander(f"{name}", expanded=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                role = st.selectbox(f"Ruolo", roles, key=f"role_{name}")
+                rest = st.slider(f"Riposi settimanali", 0, 7, 2, key=f"rest_{name}")
+            with c2:
+                avail_shifts = st.multiselect(f"Turni Abilitati", shifts, default=shifts, key=f"avs_{name}")
+                unavail_dates = st.date_input(f"Giorni Indisponibili (Ferie)", [], key=f"un_{name}")
+                if not isinstance(unavail_dates, list): unavail_dates = [unavail_dates]
+            
+            staff_db[name] = {'role': role, 'rest': rest, 'shifts': avail_shifts, 'unavail': unavail_dates}
+
+# TAB 3: GENERAZIONE
+with tab_gen:
+    if st.button("ELABORA TURNI", type="primary"):
+        with st.spinner("Calcolo combinazioni ottimali..."):
+            res = generate_schedule_pro(
+                staff_db, 
+                generate_date_range(start_dt, days_num), 
+                shifts, 
+                requirements, 
+                active_days,
+                avoid_consecutive
+            )
+            st.session_state.schedule_df = pd.DataFrame(res)
+
+    if st.session_state.schedule_df is not None:
+        df = st.session_state.schedule_df
+        
+        st.markdown("### Risultato Pianificazione")
+        edited_df = st.data_editor(
+            df, 
+            use_container_width=True, 
+            height=500,
+            column_config={"Data": st.column_config.DateColumn(format="DD/MM/YYYY")}
+        )
+        
+        flat_list = []
+        for s in shifts: flat_list.extend(edited_df[s].tolist())
+        scoperti = sum([str(x).count("SCOPERTO") for x in flat_list])
+        
+        if scoperti == 0:
+            st.success("Tutti i turni sono coperti correttamente.")
+        else:
+            st.error(f"Attenzione: {scoperti} posizioni risultano scoperte.")
+
+        try:
+            pdf_data = pdf_export(edited_df, shifts)
+            st.download_button("SCARICA PDF", pdf_data, "turni.pdf", "application/pdf")
+        except Exception as e:
+            st.error(f"Errore PDF: {e}")
+
+# TAB 4: COMUNICAZIONI
+with tab_comm:
+    st.subheader("Esportazione per Chat")
+    st.info("Genera un messaggio formattato pronto per essere inviato sul gruppo aziendale.")
+    
+    if st.session_state.schedule_df is not None:
+        wa_text = f"*TURNI SETTIMANALI - DAL {start_dt.strftime('%d/%m')}*\n\n"
+        df = st.session_state.schedule_df
+        for index, row in df.iterrows():
+            if row['Giorno'] not in active_days: continue
+            date_str = row['Data'].strftime('%d/%m') if hasattr(row['Data'], 'strftime') else str(row['Data'])
+            wa_text += f"📅 *{row['Giorno']} {date_str}*\n"
+            for s in shifts:
+                staff_str = str(row[s])
+                if staff_str == "-" or staff_str == "CHIUSO":
+                    continue
+                staff_list = staff_str.split(", ")
+                formatted_staff = "\n".join([f"   ▫ {p}" for p in staff_list])
+                wa_text += f"   *{s.upper()}*:\n{formatted_staff}\n"
+            wa_text += "-------------------\n"
+        
+        # Correzione f-string
+        st.text_area("Copia questo testo:", wa_text, height=400)
+    else:
+        st.warning("Genera prima i turni per vedere l'anteprima del messaggio.")
