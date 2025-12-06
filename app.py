@@ -36,7 +36,7 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "CLEAN CORPORATE" (NO EMOJI) ---
+# --- 3. CSS "CORPORATE BLUE" (AGGIORNATO) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
@@ -52,20 +52,21 @@ st.markdown("""
         border-right: 1px solid #dee2e6;
     }
     
-    /* Buttons */
+    /* Buttons - STILE BLU PROFESSIONALE */
     .stButton>button {
-        background-color: #212529;
+        background-color: #0056b3; /* Blu Scuro */
         color: white;
         border-radius: 4px;
         border: none;
         padding: 0.5rem 1rem;
-        font-weight: 500;
+        font-weight: 600;
         text-transform: uppercase;
         font-size: 0.85rem;
         letter-spacing: 0.5px;
+        transition: background-color 0.2s ease;
     }
     .stButton>button:hover {
-        background-color: #495057;
+        background-color: #004494; /* Blu ancora più scuro per hover */
     }
     
     /* Tabs */
@@ -85,8 +86,8 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] {
         background-color: transparent;
-        border-bottom: 2px solid #212529;
-        color: #212529;
+        border-bottom: 2px solid #0056b3; /* Sottolineatura Blu */
+        color: #0056b3;
         font-weight: 600;
     }
     
@@ -139,14 +140,14 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
         weeks = len(date_list) / 7
         targets[name] = len(date_list) - round(weeks * info['rest'])
 
-    prev_day_assignments = {} # Per tracciare chi ha fatto cosa ieri
+    prev_day_assignments = {} 
 
     for current_day in date_list:
         day_name = get_day_name(current_day)
         is_weekend = current_day.weekday() >= 5
         
         row = {"Data": current_day, "Giorno": day_name}
-        current_day_assignments = {s: [] for s in shifts} # Traccia oggi per salvare per domani
+        current_day_assignments = {s: [] for s in shifts} 
         
         if day_name not in active_days:
             for s in shifts: row[s] = "CHIUSO"
@@ -174,7 +175,7 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
                     if work_counts[name] >= targets[name]: continue
                     if name in worked_today: continue
                     
-                    # 3. LOGICA CONSECUTIVA
+                    # 3. Logica Consecutiva
                     if avoid_same_consecutive and prev_day_assignments:
                         people_yesterday_same_shift = prev_day_assignments.get(shift, [])
                         if name in people_yesterday_same_shift:
@@ -182,7 +183,7 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
 
                     candidates.append(name)
                 
-                # Ordinamento (Meno turni = Priorità)
+                # Ordinamento 
                 if is_weekend:
                     candidates.sort(key=lambda x: (weekend_counts[x], work_counts[x], random.random()))
                 else:
@@ -191,7 +192,6 @@ def generate_schedule_pro(staff_db, date_list, shifts, reqs, active_days, avoid_
                 # Selezione
                 for i in range(min(len(candidates), count_needed)):
                     chosen = candidates[i]
-                    # Format: NOME (RUOLO)
                     display_name = f"{chosen} ({role[:3].upper()})"
                     assigned_names.append(display_name)
                     
@@ -247,7 +247,6 @@ def pdf_export(df, shifts):
             else:
                 pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", '', 7)
             
-            # Tronca testi troppo lunghi per il PDF
             if len(txt) > 30: txt = txt[:27] + "..."
             pdf.cell(col_w, 8, txt, 1, 0, 'C')
             
