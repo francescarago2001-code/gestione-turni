@@ -8,7 +8,7 @@ from fpdf import FPDF
 
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(
-    page_title="Gestione Turni Operativi",
+    page_title="Gestione Turni Pro",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -18,29 +18,20 @@ LICENSE_FILE = "license_data.json"
 TRIAL_DAYS = 7
 
 def check_trial_status():
-    """
-    Controlla lo stato della prova.
-    Ritorna: (is_active, days_remaining, start_date)
-    """
     today = date.today()
-    
-    # Se il file di licenza non esiste, è il PRIMO ACCESSO
     if not os.path.exists(LICENSE_FILE):
         data = {"start_date": str(today)}
         with open(LICENSE_FILE, "w") as f:
             json.dump(data, f)
         return True, TRIAL_DAYS, today
 
-    # Se esiste, leggiamo la data di inizio
     try:
         with open(LICENSE_FILE, "r") as f:
             data = json.load(f)
         start_date = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
     except:
-        # Se il file è corrotto, resettiamo per sicurezza
         return False, 0, today
 
-    # Calcolo giorni trascorsi
     days_elapsed = (today - start_date).days
     days_remaining = TRIAL_DAYS - days_elapsed
 
@@ -49,92 +40,35 @@ def check_trial_status():
     else:
         return True, days_remaining, start_date
 
-# ESECUZIONE CONTROLLO LICENZA
 trial_active, days_left, trial_start = check_trial_status()
 
 # --- CSS STILE BUSINESS ---
-# Usiamo una variabile per il CSS per evitare errori di indentazione
 css_style = """
     <style>
-    /* Reset e Font */
-    .stApp {
-        background-color: #ffffff;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        color: #333333;
-    }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #e9ecef;
-    }
-    
-    /* Intestazioni */
-    h1, h2, h3 {
-        color: #2c3e50 !important;
-        font-weight: 500;
-        letter-spacing: -0.5px;
-    }
-    
-    /* Bottoni */
-    .stButton>button {
-        background-color: #2c3e50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 0.6rem 1.2rem;
-        font-weight: 500;
-        width: 100%;
-        transition: background 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #1a252f;
-    }
-    
-    /* Messaggi */
-    .stAlert {
-        border: 1px solid #dee2e6;
-        background-color: #f8f9fa;
-        color: #333;
-    }
-    
-    /* Blocco Pagamento */
-    .payment-container {
-        text-align: center;
-        padding: 50px;
-        border: 2px solid #e74c3c;
-        border-radius: 10px;
-        background-color: #fdf2f2;
-        margin-top: 50px;
-    }
+    .stApp { background-color: #ffffff; color: #333333; }
+    [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e9ecef; }
+    h1, h2, h3 { color: #2c3e50 !important; }
+    .stButton>button { background-color: #2c3e50; color: white; border-radius: 4px; }
+    .payment-container { text-align: center; padding: 50px; border: 2px solid #e74c3c; background-color: #fdf2f2; margin-top: 50px; border-radius: 10px;}
     </style>
 """
 st.markdown(css_style, unsafe_allow_html=True)
 
 # --- BLOCCO SOFTWARE SE PROVA SCADUTA ---
 if not trial_active:
-    # Definisco il messaggio HTML in una variabile separata
     alert_html = f"""
     <div class="payment-container">
         <h1 style="color: #c0392b !important;">🚫 Periodo di Prova Scaduto</h1>
-        <p style="font-size: 18px;">I tuoi {TRIAL_DAYS} giorni di prova gratuita sono terminati.</p>
-        <p>Per continuare a generare turni e utilizzare il software, è necessario acquistare una licenza completa.</p>
-        <br>
+        <p>I tuoi {TRIAL_DAYS} giorni di prova sono terminati. Acquista la licenza per continuare.</p>
     </div>
     """
     st.markdown(alert_html, unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.write("") # Spacer
-        # Inserisci qui il tuo link di pagamento reale
         st.link_button("💳 ACQUISTA LICENZA ORA", "https://www.paypal.com/it/home") 
-    
-    # BLOCCO ESECUZIONE DEL RESTO DEL CODICE
     st.stop()
 
-# --- DA QUI IN POI IL CODICE VIENE ESEGUITO SOLO SE LA PROVA È ATTIVA ---
-
+# --- STATO SESSIONE ---
 if 'schedule_df' not in st.session_state:
     st.session_state.schedule_df = None
 
@@ -145,48 +79,107 @@ def generate_date_range(start_date, num_days):
 def calculate_target(total_days, weekly_rest):
     weeks = total_days / 7
     total_rest = round(weeks * weekly_rest)
-    target = total_days - total_rest
-    return max(0, target)
+    return max(0, total_days - total_rest)
 
-def generate_schedule(staff_data, date_list, shift_types, prevent_consecutive):
+def get_italian_day(date_obj):
+    days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
+    return days[date_obj.weekday()]
+
+def generate_schedule(staff_data, date_list, shift_types, prevent_consecutive, active_days_list):
     schedule = []
-    work_counts = {name: 0 for name in staff_data.keys()}
-    targets = {}
     
+    # Contatori per l'equità
+    work_counts = {name: 0 for name in staff_data.keys()}
+    weekend_counts = {name: 0 for name in staff_data.keys()} # Contatore specifico weekend
+    
+    # Calcolo target teorici (approssimativo)
+    targets = {}
     for name, data in staff_data.items():
         targets[name] = calculate_target(len(date_list), data['weekly_rest'])
 
     for current_day in date_list:
+        day_name_it = get_italian_day(current_day)
+        is_weekend = current_day.weekday() >= 5 # 5=Sabato, 6=Domenica
+        
+        # 1. CONTROLLO GIORNI AZIENDALI
+        # Se il giorno non è tra quelli lavorativi dell'azienda, salta e metti "CHIUSO" o vuoto
+        if day_name_it not in active_days_list:
+            # Creiamo una riga vuota o "Chiuso" per mantenere la continuità visiva
+            closed_row = {"Data": current_day, "Giorno": day_name_it}
+            for s in shift_types:
+                closed_row[s] = "CHIUSO"
+            schedule.append(closed_row)
+            continue
+
         day_schedule = {
             "Data": current_day,
-            "Giorno": current_day.strftime("%A")
+            "Giorno": day_name_it
         }
+        
         worked_today = []
         yesterday_schedule = schedule[-1] if len(schedule) > 0 else None
         
         for shift_name in shift_types:
             candidates = []
+            
             for name, data in staff_data.items():
-                if work_counts[name] >= targets[name]: continue
-                if name in worked_today: continue
+                # --- REGOLE DI ESCLUSIONE ---
+                
+                # A. Indisponibilità specifica (Ferie/Malattia)
+                if current_day in data['unavailable']:
+                    continue
+                
+                # B. Turno non abilitato per questa persona (es. Mario non fa la Notte)
+                if shift_name not in data['allowed_shifts']:
+                    continue
+
+                # C. Target Raggiunto (Equità generale)
+                if work_counts[name] >= targets[name]: 
+                    continue
+                
+                # D. Già lavorato oggi (niente doppi turni)
+                if name in worked_today: 
+                    continue
+                
+                # E. Consecutività (Niente Mattina se ieri hai fatto Mattina, opzionale)
                 if prevent_consecutive and yesterday_schedule:
                     if yesterday_schedule.get(shift_name) == name:
                         continue
+                
                 candidates.append(name)
             
             selected_person = "SCOPERTO"
+            
             if candidates:
-                candidates.sort(key=lambda x: work_counts[x])
-                min_val = work_counts[candidates[0]]
-                best_candidates = [c for c in candidates if work_counts[c] == min_val]
-                chosen = random.choice(best_candidates)
+                # --- ALGORITMO DI SELEZIONE PRIORITARIA ---
+                # Ordiniamo i candidati. 
+                # Criterio 1: Se è weekend, privilegia chi ha fatto MENO weekend.
+                # Criterio 2: Privilegia chi ha fatto MENO turni totali.
+                # Criterio 3: Random per rompere la parità.
+                
+                if is_weekend:
+                    # Ordina prima per weekend lavorati, poi per totale
+                    candidates.sort(key=lambda x: (weekend_counts[x], work_counts[x], random.random()))
+                else:
+                    # Ordina solo per totale lavorato
+                    candidates.sort(key=lambda x: (work_counts[x], random.random()))
+                
+                # Prendiamo il migliore
+                chosen = candidates[0]
+                
                 selected_person = chosen
+                
+                # Aggiorna contatori
                 work_counts[chosen] += 1
+                if is_weekend:
+                    weekend_counts[chosen] += 1
+                    
                 worked_today.append(chosen)
             
             day_schedule[shift_name] = selected_person
             
         schedule.append(day_schedule)
+            
     return schedule
 
 def export_to_pdf(dataframe, shift_cols):
@@ -220,88 +213,133 @@ def export_to_pdf(dataframe, shift_cols):
             d_str = str(row['Data'])
             
         day_str = str(row['Giorno']).encode('latin-1', 'replace').decode('latin-1')
+        
         pdf.cell(date_w, 10, d_str, 1, 0, 'C')
         pdf.cell(day_w, 10, day_str, 1, 0, 'C')
         
         for s in shift_cols:
             val = str(row[s])
             val_enc = val.encode('latin-1', 'replace').decode('latin-1')
+            
             if val == "SCOPERTO":
-                pdf.set_text_color(180, 0, 0)
-                pdf.set_font("Helvetica", 'B', 9)
+                pdf.set_text_color(180, 0, 0); pdf.set_font("Helvetica", 'B', 9)
+            elif val == "CHIUSO":
+                pdf.set_text_color(150, 150, 150); pdf.set_font("Helvetica", 'I', 9)
             else:
-                pdf.set_text_color(0, 0, 0)
-                pdf.set_font("Helvetica", size=9)
+                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", size=9)
+                
             pdf.cell(shift_w, 10, val_enc, 1, 0, 'C')
             
         pdf.set_text_color(0, 0, 0)
         pdf.ln()
+        
     return pdf.output(dest='S').encode('latin-1')
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.markdown("### 🔐 Licenza Demo")
     if days_left > 3:
-        st.success(f"Prova Attiva: **{days_left}** giorni rimanenti.")
+        st.success(f"Prova Attiva: **{days_left}** gg rimasti.")
     else:
-        st.warning(f"⚠️ Attenzione: mancano solo **{days_left}** giorni.")
+        st.warning(f"⚠️ Scadenza tra **{days_left}** gg.")
     st.progress(days_left / TRIAL_DAYS)
-    st.caption(f"Inizio prova: {trial_start.strftime('%d/%m/%Y')}")
     st.markdown("---")
 
-    st.header("Impostazioni")
+    st.header("1. Parametri Generali")
     start_date = st.date_input("Data Inizio", date.today())
-    duration = st.number_input("Giorni totali", 1, 365, 30)
+    duration = st.number_input("Giorni da pianificare", 7, 365, 30)
     
-    st.subheader("Turni")
-    shifts_input = st.text_input("Nomi Turni (separati da virgola)", "Mattina, Pomeriggio")
+    st.subheader("Giorni Operativi Azienda")
+    days_of_week_it = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+    # Default: Lun-Ven
+    active_days = st.multiselect("Seleziona giorni lavorativi", days_of_week_it, default=days_of_week_it)
+    
+    st.subheader("Definizione Turni")
+    shifts_input = st.text_input("Nomi Turni (virgola)", "Mattina, Pomeriggio")
     shift_types = [s.strip() for s in shifts_input.split(',') if s.strip()]
     
-    st.subheader("Regole")
-    prevent_consecutive = st.checkbox("Evita stesso turno consecutivo", value=True)
-    
-    st.subheader("Risorse")
-    staff_input = st.text_area("Lista Dipendenti", "Rossi\nBianchi\nVerdi\nNeri")
+    st.markdown("---")
+    st.header("2. Gestione Staff")
+    staff_input = st.text_area("Inserisci Nomi (uno per riga)", "Rossi\nBianchi\nVerdi")
     staff_names = [x.strip() for x in staff_input.split('\n') if x.strip()]
 
-# --- MAIN ---
-st.title("Gestione Turni")
+# --- MAIN PAGE ---
+st.title("Gestione Turni Pro")
 
-if not staff_names or not shift_types:
-    st.warning("Compilare le impostazioni nella barra laterale per procedere.")
+if not staff_names or not shift_types or not active_days:
+    st.warning("Configura i parametri nella barra laterale (Turni, Staff e Giorni Operativi).")
     st.stop()
 
-# --- CONFIGURAZIONE RIPOSI ---
-st.subheader("Configurazione Riposi")
-st.caption("Indicare i giorni di riposo settimanali desiderati per ogni risorsa.")
+# --- CONFIGURAZIONE AVANZATA DIPENDENTI ---
+st.subheader("3. Dettagli e Disponibilità Risorse")
+st.info("Configura qui ferie, preferenze turni e riposi per ogni dipendente.")
 
 staff_data = {}
-cols = st.columns(3)
-for i, name in enumerate(staff_names):
-    with cols[i % 3]:
-        w_rest = st.number_input(f"{name}", 0, 7, 2, key=f"wr_{name}")
-        staff_data[name] = {'weekly_rest': w_rest}
+
+# Usiamo un container espandibile per ogni dipendente per pulizia visiva
+for name in staff_names:
+    with st.expander(f"👤 Configura: **{name}**", expanded=False):
+        col_a, col_b = st.columns(2)
+        
+        with col_a:
+            w_rest = st.slider(f"Giorni riposo/settimana ({name})", 0, 7, 2, key=f"wr_{name}")
+            # Scelta turni abilitati (es. solo Mattina)
+            allowed = st.multiselect(
+                f"Turni abilitati per {name}", 
+                options=shift_types, 
+                default=shift_types, 
+                key=f"all_{name}"
+            )
+            
+        with col_b:
+            # Scelta giorni di ferie/indisponibilità
+            unavailable = st.date_input(
+                f"Date Indisponibili/Ferie ({name})", 
+                [], 
+                key=f"un_{name}",
+                help="Seleziona i giorni in cui il dipendente NON può lavorare."
+            )
+            # Converti input singolo o lista in lista sicura
+            if not isinstance(unavailable, list):
+                unavailable = [unavailable]
+        
+        # Salvataggio dati
+        staff_data[name] = {
+            'weekly_rest': w_rest,
+            'allowed_shifts': allowed,
+            'unavailable': unavailable
+        }
 
 st.markdown("---")
 
 # --- GENERAZIONE ---
-if st.button("Genera Bozza Turni", type="primary"):
+col_gen, col_info = st.columns([1, 2])
+with col_gen:
+    generate_btn = st.button("🚀 Genera Turni Ottimizzati", type="primary")
+
+if generate_btn:
     date_range = generate_date_range(start_date, duration)
-    schedule_data = generate_schedule(staff_data, date_range, shift_types, prevent_consecutive)
+    
+    # Esecuzione algoritmo con i nuovi parametri
+    schedule_data = generate_schedule(
+        staff_data, 
+        date_range, 
+        shift_types, 
+        st.sidebar.checkbox("Evita stesso turno consecutivo", True),
+        active_days
+    )
+    
     df = pd.DataFrame(schedule_data)
-    
-    it_days = {'Monday': 'Lunedì', 'Tuesday': 'Martedì', 'Wednesday': 'Mercoledì', 
-               'Thursday': 'Giovedì', 'Friday': 'Venerdì', 'Saturday': 'Sabato', 'Sunday': 'Domenica'}
-    df['Giorno'] = df['Giorno'].map(it_days)
-    
     cols_order = ['Data', 'Giorno'] + shift_types
     df = df[cols_order]
+    
     st.session_state.schedule_df = df
+    st.success("Turni generati con successo considerando ferie ed equità weekend!")
 
 # --- VISUALIZZAZIONE E MODIFICA ---
 if st.session_state.schedule_df is not None:
-    st.subheader("Pianificazione Operativa (Modificabile)")
-    st.caption("Clicca sulle celle per modificare manualmente le assegnazioni.")
+    st.subheader("📅 Pianificazione Operativa")
+    st.caption("Puoi modificare manualmente le celle se necessario.")
     
     edited_df = st.data_editor(
         st.session_state.schedule_df,
@@ -314,18 +352,18 @@ if st.session_state.schedule_df is not None:
         num_rows="fixed"
     )
     
-    st.markdown("### Esportazione")
-    col_pdf, _ = st.columns([1, 5])
+    st.markdown("### Azioni")
+    col_pdf, _ = st.columns([1, 4])
     
     with col_pdf:
         try:
             pdf_bytes = export_to_pdf(edited_df, shift_types)
             st.download_button(
-                label="Scarica PDF Definitivo",
+                label="📥 Scarica PDF Stampa",
                 data=pdf_bytes,
-                file_name="Piano_Turni.pdf",
+                file_name="Piano_Turni_Pro.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         except Exception as e:
-            st.error(f"Errore generazione PDF: {e}")
+            st.error(f"Errore PDF: {e}")
