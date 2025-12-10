@@ -298,7 +298,7 @@ with st.sidebar:
     # Assicurati che il file "logo.png" sia nella stessa cartella di questo script.
     # Se il tuo file si chiama diversamente (es. "snobol_logo.jpg"), modifica il nome qui sotto.
     try:
-        st.image("logo.png", width=120) 
+        st.image("logo.png", width=250) 
     except:
         # Fallback se l'immagine non viene trovata
         st.warning("File 'logo.png' non trovato.")
