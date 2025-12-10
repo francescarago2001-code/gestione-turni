@@ -6,10 +6,10 @@ import os
 from datetime import date, timedelta, datetime
 from fpdf import FPDF
 
-# --- 1. CONFIGURAZIONE PAGINA (Strict Mode) ---
+# --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(
     page_title="Snobol Enterprise",
-    page_icon=None, # Nessuna icona giocosa
+    # page_icon="logo_icon.png", # SE VUOI L'ICONCINA SULLA SCHEDA DEL BROWSER, DECOMMENTA E METTI IL FILE
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -37,19 +37,19 @@ def check_trial_status():
 
 trial_active, days_left, trial_start = check_trial_status()
 
-# --- 3. CSS "ENTERPRISE GRADE" (Minimalismo Radicale) ---
+# --- 3. CSS "ENTERPRISE LIGHT THEME" (Bianco Professionale) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');
     
     :root {
-        --bg-color: #09090b;          /* Nero zinco */
-        --sidebar-bg: #000000;        /* Nero assoluto */
-        --card-bg: #18181b;           /* Grigio scuro */
-        --text-primary: #e4e4e7;      /* Bianco sporco */
-        --text-secondary: #a1a1aa;    /* Grigio testo */
-        --accent: #00f2ff;            /* Ciano Snobol */
-        --border: #27272a;            /* Bordi sottili */
+        --bg-color: #ffffff;          /* Bianco puro */
+        --sidebar-bg: #f8fafc;        /* Grigio chiarissimo per contrasto */
+        --text-primary: #0f172a;      /* Nero/Blu scuro per testi principali */
+        --text-secondary: #64748b;    /* Grigio medio per testi secondari */
+        --accent: #00f2ff;            /* Ciano Snobol (brand) */
+        --accent-dark: #0ea5e9;       /* Versione più scura per hover */
+        --border: #e2e8f0;            /* Bordi grigio chiaro */
     }
 
     /* RESET GENERALE */
@@ -59,87 +59,93 @@ st.markdown("""
         color: var(--text-primary);
     }
     
-    h1, h2, h3 {
+    h1, h2, h3, h4 {
         font-weight: 600;
         letter-spacing: -0.5px;
-        color: white !important;
+        color: var(--text-primary) !important;
     }
     
-    p, label, span {
+    p, label, span, div.stMarkdown {
         color: var(--text-secondary) !important;
         font-size: 0.9rem;
     }
 
     /* SIDEBAR PULITA */
-    [data-testid="stSidebar"] {
+    section[data-testid="stSidebar"] {
         background-color: var(--sidebar-bg);
         border-right: 1px solid var(--border);
     }
     [data-testid="stSidebar"] hr {
         border-color: var(--border);
     }
+    # [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: var(--text-primary) !important;
+    }
 
-    /* INPUT FIELDS (Stile Tecnico) */
+    /* INPUT FIELDS (Stile Tecnico Chiaro) */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {
-        background-color: var(--bg-color) !important;
+        background-color: #ffffff !important;
         color: var(--text-primary) !important;
         border: 1px solid var(--border) !important;
-        border-radius: 4px !important; /* Angoli meno arrotondati = più serio */
+        border-radius: 4px !important;
         font-family: 'Inter', sans-serif;
     }
-    .stTextInput input:focus, .stNumberInput input:focus {
-        border-color: var(--accent) !important;
-        box-shadow: none !important;
+    .stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+        border-color: var(--accent-dark) !important;
+        box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1) !important;
     }
 
     /* SELECTBOX & TAGS */
     div[data-baseweb="select"] > div {
-        background-color: var(--bg-color) !important;
+        background-color: #ffffff !important;
         border-color: var(--border) !important;
         border-radius: 4px !important;
+        color: var(--text-primary) !important;
     }
     span[data-baseweb="tag"] {
-        background-color: #27272a !important;
-        border: 1px solid #3f3f46 !important;
+        background-color: #f1f5f9 !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 2px !important;
     }
     span[data-baseweb="tag"] span {
-        color: #fff !important;
-        font-family: 'JetBrains Mono', monospace; /* Font codice per i dati */
+        color: var(--text-primary) !important;
+        font-family: 'JetBrains Mono', monospace;
         font-size: 0.8rem;
     }
 
-    /* BOTTONI (Stile Software, non Sito Web) */
+    /* BOTTONI (Stile Software) */
     .stButton > button {
         background-color: var(--text-primary) !important;
-        color: black !important;
+        color: white !important;
         border-radius: 4px !important;
         border: none !important;
         font-weight: 600 !important;
         font-size: 0.85rem !important;
         padding: 0.5rem 1rem !important;
-        text-transform: none !important; /* Niente maiuscolo forzato */
+        text-transform: none !important;
         transition: all 0.2s;
     }
     .stButton > button:hover {
-        background-color: var(--accent) !important;
-        box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        background-color: var(--accent-dark) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     
-    /* BOTTONI SECONDARI */
+    /* BOTTONI SECONDARI (Download) */
     [data-testid="stDownloadButton"] > button {
-        background: transparent !important;
+        background: white !important;
         border: 1px solid var(--border) !important;
         color: var(--text-primary) !important;
     }
     [data-testid="stDownloadButton"] > button:hover {
         border-color: var(--text-primary) !important;
+        background: #f8fafc !important;
     }
 
-    /* TABS (Minimal) */
+    /* TABS (Minimal Light) */
     .stTabs [data-baseweb="tab-list"] {
         border-bottom: 1px solid var(--border);
         gap: 30px;
+        background-color: white;
     }
     .stTabs [data-baseweb="tab"] {
         font-family: 'JetBrains Mono', monospace;
@@ -148,52 +154,29 @@ st.markdown("""
         padding-bottom: 10px;
     }
     .stTabs [aria-selected="true"] {
-        color: var(--accent) !important;
-        border-bottom: 2px solid var(--accent) !important;
+        color: var(--accent-dark) !important;
+        border-bottom: 2px solid var(--accent-dark) !important;
     }
 
     /* TABELLE DATI */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--border);
-        background-color: var(--bg-color);
-    }
-
-    /* HEADER LOGO CUSTOM (Puro CSS) */
-    .logo-container {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 10px;
-    }
-    .logo-ring {
-        width: 24px;
-        height: 24px;
-        border: 3px solid var(--accent);
-        border-radius: 50%;
-        box-shadow: 0 0 10px var(--accent);
-    }
-    .logo-text {
-        font-family: 'Inter', sans-serif;
-        font-weight: 700;
-        font-size: 1.5rem;
-        color: white;
-        letter-spacing: -0.5px;
-    }
-    .version-tag {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.7rem;
-        color: #555;
-        border: 1px solid #333;
-        padding: 2px 6px;
-        border-radius: 4px;
-        margin-left: 10px;
+        background-color: white;
     }
     
-    /* ALERT CUSTOM */
+    /* EXPANDER */
+    .streamlit-expanderHeader {
+        background-color: white !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-primary) !important;
+        border-radius: 4px !important;
+    }
+    
+    /* ALERT CUSTOM LIGHT */
     .stAlert {
-        background-color: #18181b;
-        border: 1px solid #333;
-        color: #d4d4d8;
+        background-color: #f8fafc;
+        border: 1px solid var(--border);
+        color: var(--text-primary);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -287,7 +270,7 @@ def pdf_export(df, shifts):
     pdf.ln(2)
     cols = ['Data', 'Giorno'] + shifts
     col_w = 275 / len(cols)
-    pdf.set_fill_color(240, 240, 240) 
+    pdf.set_fill_color(245, 245, 245) 
     pdf.set_font("Helvetica", 'B', 8)
     for c in cols:
         pdf.cell(col_w, 8, c.upper(), 1, 0, 'C', True)
@@ -309,17 +292,18 @@ def pdf_export(df, shifts):
         pdf.ln()
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 6. SIDEBAR (Pannello Controllo) ---
+# --- 6. SIDEBAR (Pannello Controllo con LOGO IMMAGINE) ---
 with st.sidebar:
-    # Logo Enterprise
-    st.markdown("""
-        <div class="logo-container">
-            <div class="logo-ring"></div>
-            <div class="logo-text">Snobol</div>
-            <div class="version-tag">ENT</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
+    # --- INSERIMENTO LOGO ---
+    # Assicurati che il file "logo.png" sia nella stessa cartella di questo script.
+    # Se il tuo file si chiama diversamente (es. "snobol_logo.jpg"), modifica il nome qui sotto.
+    try:
+        st.image("logo.png", width=180) 
+    except:
+        # Fallback se l'immagine non viene trovata
+        st.warning("File 'logo.png' non trovato.")
+        st.markdown("### Snobol Enterprise")
+
     st.markdown("---")
     
     st.markdown("#### CONFIGURAZIONE GLOBALE")
@@ -343,7 +327,13 @@ with st.sidebar:
     staff_names = [n.strip() for n in staff_names_in.split('\n') if n.strip()]
     
     st.markdown("---")
-    st.caption(f"Status Licenza: ATTIVA ({days_left} giorni)")
+    # Esempio di badge di stato professionale
+    st.markdown(f"""
+        <div style='display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: #64748b; background: #f1f5f9; padding: 8px; border-radius: 4px; border: 1px solid #e2e8f0;'>
+            <div style='width: 8px; height: 8px; background: #22c55e; border-radius: 50%;'></div>
+            Licenza Attiva ({days_left}gg)
+        </div>
+    """, unsafe_allow_html=True)
 
 # --- 7. HEADER PAGINA PRINCIPALE ---
 
@@ -368,12 +358,18 @@ tab_req, tab_staff, tab_gen, tab_comm = st.tabs(["FABBISOGNO", "ANAGRAFICA", "EL
 # TAB 1: FABBISOGNO
 with tab_req:
     st.markdown("#### Definizione Carico di Lavoro")
+    st.markdown("Indicare il numero di risorse necessarie per ruolo in ogni turno.")
     
     requirements = {}
     cols = st.columns(len(shifts))
     for i, shift in enumerate(shifts):
         with cols[i]:
-            st.markdown(f"**TURNO: {shift.upper()}**")
+            # Box per il nome del turno
+            st.markdown(f"""
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 4px; font-weight: 600; text-align: center; margin-bottom: 15px; color: #0f172a;">
+                    TURNO: {shift.upper()}
+                </div>
+            """, unsafe_allow_html=True)
             shift_reqs = {}
             for role in roles:
                 count = st.number_input(f"{role}", min_value=0, value=1, key=f"req_{shift}_{role}")
@@ -383,6 +379,7 @@ with tab_req:
 # TAB 2: STAFF
 with tab_staff:
     st.markdown("#### Parametri Individuali")
+    st.markdown("Configurazione vincoli contrattuali e disponibilità.")
     staff_db = {}
     
     for name in staff_names:
@@ -442,6 +439,7 @@ with tab_gen:
 # TAB 4: COMUNICAZIONI
 with tab_comm:
     st.markdown("#### Testo per Comunicazione Interna")
+    st.markdown("Formato testo semplice per la distribuzione rapida.")
     
     if st.session_state.schedule_df is not None:
         wa_text = f"SNOBOL // PLANNING OPERATIVO - DAL {start_dt.strftime('%d/%m')}\n\n"
